@@ -33,16 +33,16 @@ HOURLY_CHUNK_DAYS: Final = 30
 # rate limited to once every two hours, so stay just outside that.
 CATCHUP_INTERVAL: Final = timedelta(hours=2, minutes=5)
 
-# Readings arrive late and get revised, so re-import a trailing window on every
-# pass rather than only strictly-new hours. This is what repairs hours that were
-# previously stored as 0 because the data had not landed yet.
-REFRESH_WINDOW_HOURS: Final = 72
+# Readings arrive late and get revised, sometimes days later, so re-import a
+# trailing window on every pass rather than only strictly-new hours. A week
+# reaches past the 24 to 48 hour delays reported against the DCC feed, and costs
+# one request per resource per pass.
+REFRESH_WINDOW_HOURS: Final = 7 * 24
 
-# A run of zeroes at the end of a response nearly always means "not collected
-# yet" rather than "used nothing", so those hours are left for a later pass.
-# Past this age, believe them — otherwise a genuinely idle meter would park the
-# import cursor forever.
-ZERO_TAIL_GRACE_HOURS: Final = 48
+# How far back to look for the stored running total that anchors a re-import.
+# Longer than the refresh window, so a feed that stalled for a while still
+# finds its anchor instead of rebuilding the whole series.
+ANCHOR_LOOKBACK_DAYS: Final = 30
 
 # How long to let an in-flight backfill finish when the entry is going away.
 # It must be allowed to finish rather than be cancelled: its recorder queries

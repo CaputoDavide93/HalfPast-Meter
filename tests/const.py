@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
+
+from custom_components.bright_meter.api import Tariff
 
 USERNAME = "meter@example.com"
 PASSWORD = "hunter2"
@@ -87,11 +89,21 @@ HOURLY_ENERGY = 0.5
 HOURLY_COST = 12.0
 
 
+TARIFF_ELEC = Tariff(unit_rate_p=24.46, standing_charge_p=49.66)
+TARIFF_GAS = Tariff(unit_rate_p=8.62, standing_charge_p=12.53)
+
+
+def _hour(moment: datetime) -> datetime:
+    return moment.replace(minute=0, second=0, microsecond=0)
+
+
 class FakeGlowmarktClient:
     """Stands in for GlowmarktClient so tests exercise our logic, not aiohttp.
 
     Generates one reading per hour across whatever range is asked for, which
-    lets the backfill assertions be exact.
+    lets the backfill assertions be exact. It answers the way the real API does
+    with `nulls=1`: an hour Glowmarkt has not collected is None, and
+    `last-time` names the newest half-hour it holds.
     """
 
     def __init__(
@@ -102,9 +114,12 @@ class FakeGlowmarktClient:
     ) -> None:
         """Set up the canned account shape.
 
-        `zero_from` makes hourly readings at or after that moment come back as
-        0.0, which is how the real API behaves for hours it has not collected
-        from the DCC yet.
+        `zero_from` marks the first hour not collected from the DCC yet: hours
+        at or after it come back as None, and `last-time` stops just before it.
+        `gaps` are hours missing in the middle of the data; `zeros` are hours in
+        which genuinely nothing was used. `values_past_last_time` makes the
+        uncollected hours answer 0 instead of None, as the API does when it
+        ignores `nulls=1`.
         """
         self.virtual_entities = (
             virtual_entities if virtual_entities is not None else VIRTUAL_ENTITIES
@@ -113,9 +128,22 @@ class FakeGlowmarktClient:
             resources if resources is not None else RESOURCES_DUAL_FUEL
         )
         self.zero_from = zero_from
+        self.gaps: set[datetime] = set()
+        self.zeros: set[datetime] = set()
+        self.values_past_last_time = False
+        self.tariffs: dict[str, Tariff | None] = {
+            RES_ELEC: TARIFF_ELEC,
+            RES_GAS: TARIFF_GAS,
+        }
         self.readings_calls: list[tuple[str, str]] = []
         self.catchup_calls: list[str] = []
+        self.tariff_calls: list[str] = []
         self.login_calls = 0
+
+    def _uncollected_from(self) -> datetime:
+        if self.zero_from is not None:
+            return self.zero_from
+        return _hour(datetime.now(UTC))
 
     async def async_login(self) -> None:
         """Pretend to authenticate."""
@@ -134,6 +162,15 @@ class FakeGlowmarktClient:
         """Return the canned resources for any virtual entity."""
         return self.resources
 
+    async def async_get_last_time(self, resource_id: str) -> datetime | None:
+        """The second half-hour of the last collected hour."""
+        return self._uncollected_from() - timedelta(minutes=30)
+
+    async def async_get_tariff(self, resource_id: str) -> Tariff | None:
+        """Return the canned rates the meter holds."""
+        self.tariff_calls.append(resource_id)
+        return self.tariffs.get(resource_id)
+
     async def async_get_readings(
         self,
         resource_id: str,
@@ -143,21 +180,28 @@ class FakeGlowmarktClient:
         *,
         offset_minutes: int = 0,
         function: str = "sum",
-    ) -> list[tuple[int, float]]:
+    ) -> list[tuple[int, float | None]]:
         """Return canned readings for the requested window."""
         self.readings_calls.append((resource_id, period))
         is_cost = resource_id.endswith("cost")
 
         if period == "P1D":
             value = DAILY_COST if is_cost else DAILY_ENERGY
-            return [(int(start.replace(tzinfo=timezone.utc).timestamp()), value)]
+            return [(int(start.replace(tzinfo=UTC).timestamp()), value)]
 
         value = HOURLY_COST if is_cost else HOURLY_ENERGY
-        readings: list[tuple[int, float]] = []
-        cursor = start.replace(tzinfo=timezone.utc, minute=0, second=0, microsecond=0)
-        limit = end.replace(tzinfo=timezone.utc)
+        uncollected_from = self._uncollected_from()
+        readings: list[tuple[int, float | None]] = []
+        cursor = start.replace(tzinfo=UTC, minute=0, second=0, microsecond=0)
+        limit = end.replace(tzinfo=UTC)
         while cursor <= limit:
-            uncollected = self.zero_from is not None and cursor >= self.zero_from
-            readings.append((int(cursor.timestamp()), 0.0 if uncollected else value))
+            reading: float | None = value
+            if cursor in self.zeros:
+                reading = 0.0
+            if cursor in self.gaps:
+                reading = None
+            if cursor >= uncollected_from:
+                reading = 0.0 if self.values_past_last_time else None
+            readings.append((int(cursor.timestamp()), reading))
             cursor += timedelta(hours=1)
         return readings

@@ -312,3 +312,127 @@ async def test_stale_rows_past_the_data_are_flattened(
 
     repaired = await _rows(hass)
     assert min(deltas(repaired)) >= 0, "cumulative total still steps backwards"
+
+
+async def _setup_with(
+    hass: HomeAssistant, client: FakeGlowmarktClient, days: int = 2
+) -> MockConfigEntry:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="a@b.com",
+        data={"username": "a@b.com", "password": "pw"},
+        options={CONF_BACKFILL_DAYS: days},
+    )
+    entry.add_to_hass(hass)
+    with patch("custom_components.bright_meter.GlowmarktClient", return_value=client):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    await _settle(hass, entry)
+    return entry
+
+
+def _starts(rows: list[dict]) -> list:
+    return [dt_util.utc_from_timestamp(row["start"]) for row in rows]
+
+
+async def test_a_real_zero_at_the_end_is_imported(
+    bright_env, hass: HomeAssistant
+) -> None:
+    """Nothing used is a reading, and `last-time` says it was collected.
+
+    Export is genuinely 0 for most of a winter. The old guess held any trailing
+    run of zeroes back for 48 hours as "probably not collected"; with `nulls=1`
+    and `last-time` there is nothing to guess.
+    """
+    now_hour = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+    client = FakeGlowmarktClient()
+    client.zeros = {now_hour - timedelta(hours=h) for h in range(1, 4)}
+
+    await _setup_with(hass, client)
+
+    rows = await _rows(hass)
+    assert _starts(rows)[-1] == now_hour - timedelta(hours=1)
+    assert [row["state"] for row in rows[-3:]] == [0.0, 0.0, 0.0]
+
+
+async def test_hours_past_last_time_are_never_imported(
+    bright_env, hass: HomeAssistant
+) -> None:
+    """Even if the API answers 0 instead of null, `last-time` is the edge."""
+    now_hour = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+    collected_until = now_hour - timedelta(hours=5)
+    client = FakeGlowmarktClient(zero_from=collected_until)
+    client.values_past_last_time = True
+
+    await _setup_with(hass, client)
+
+    rows = await _rows(hass)
+    assert _starts(rows)[-1] == collected_until - timedelta(hours=1)
+    assert all(row["state"] == HOURLY_ENERGY for row in rows)
+
+
+async def test_a_gap_is_left_out_then_filled_days_later(
+    bright_env, hass: HomeAssistant
+) -> None:
+    """A missing stretch is not stored as zero, and is repaired when it lands.
+
+    Readings can arrive days late. The gap is 5 days old when it fills, beyond
+    the old 72-hour refresh window, and the running total must come out right.
+    """
+    now_hour = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+    gap = {now_hour - timedelta(days=5, hours=h) for h in range(3)}
+    client = FakeGlowmarktClient()
+    client.gaps = set(gap)
+
+    entry = await _setup_with(hass, client, days=8)
+
+    rows = await _rows(hass)
+    assert not gap & set(_starts(rows)), "a missing hour was stored"
+    sums = [row["sum"] for row in rows]
+    assert sums == sorted(sums)
+
+    client.gaps = set()
+    await entry.runtime_data.async_backfill()
+    await _settle(hass, entry)
+
+    repaired = await _rows(hass)
+    assert gap <= set(_starts(repaired))
+    assert all(row["state"] == HOURLY_ENERGY for row in repaired)
+    assert repaired[-1]["sum"] == len(repaired) * HOURLY_ENERGY
+
+
+async def test_an_hour_that_goes_missing_again_does_not_step_backwards(
+    bright_env, hass: HomeAssistant
+) -> None:
+    """A stored hour the API later reports as null is rewritten flat."""
+    now_hour = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+    client = FakeGlowmarktClient()
+    entry = await _setup_with(hass, client)
+
+    client.gaps = {now_hour - timedelta(hours=10)}
+    await entry.runtime_data.async_backfill()
+    await _settle(hass, entry)
+
+    rows = await _rows(hass)
+    deltas = [b["sum"] - a["sum"] for a, b in zip(rows, rows[1:])]
+    assert min(deltas) >= 0
+    assert rows[-1]["sum"] == (len(rows) - 1) * HOURLY_ENERGY
+
+
+async def test_energy_statistics_declare_their_unit_class(
+    bright_env, hass: HomeAssistant
+) -> None:
+    """kWh series are `energy`, so HA can convert them; money has no class."""
+    from homeassistant.components.recorder.statistics import get_metadata
+
+    await _setup_with(hass, FakeGlowmarktClient())
+
+    metadata = await hass.async_add_executor_job(
+        get_metadata,
+        hass,
+    )
+    by_id = {sid: meta for sid, (_, meta) in metadata.items()}
+    assert by_id[STAT_ID]["unit_class"] == "energy"
+    assert by_id[f"{DOMAIN}:gas_consumption"]["unit_class"] == "energy"
+    assert by_id[f"{DOMAIN}:electricity_consumption_cost"]["unit_class"] is None
+    assert by_id[f"{DOMAIN}:electricity_consumption_cost"]["unit_of_measurement"] == "GBP"

@@ -1,6 +1,6 @@
 """Async client for the Glowmarkt platform API.
 
-Deliberately thin: it knows about authentication, the four endpoints this
+Deliberately thin: it knows about authentication, the endpoints this
 integration needs, and nothing about Home Assistant.
 """
 
@@ -9,7 +9,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any, Final
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
@@ -37,6 +38,70 @@ class GlowmarktAuthError(GlowmarktError):
 
 class GlowmarktConnectionError(GlowmarktError):
     """The API could not be reached, or returned something unusable."""
+
+
+@dataclass(frozen=True, kw_only=True)
+class Tariff:
+    """The rates the meter itself holds, as reported over the DCC, in pence.
+
+    Either figure may be missing: a supplier does not always send both, and
+    some send nothing at all.
+    """
+
+    unit_rate_p: float | None
+    standing_charge_p: float | None
+
+
+def _number(value: Any) -> float | None:
+    """A rate as a float, whether sent bare or wrapped as {"value": x}."""
+    if isinstance(value, dict):
+        value = value.get("value")
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_tariff(payload: Any) -> Tariff | None:
+    """Read either documented tariff shape; None when there is no rate at all.
+
+    The Swagger spec documents `plan[].planDetail[]` with one `rate` and one
+    `standing` entry. Live accounts have also been seen answering with
+    `currentRates.rate` / `currentRates.standingCharge`, each bare or wrapped as
+    {"value": x}. When several plans are listed the newest `from` wins.
+    """
+    if not isinstance(payload, dict):
+        return None
+    entries = [e for e in payload.get("data") or [] if isinstance(e, dict)]
+    if not entries:
+        return None
+    entry = max(entries, key=lambda e: str(e.get("from") or ""))
+
+    rate: float | None = None
+    standing: float | None = None
+    for plan in entry.get("plan") or []:
+        if not isinstance(plan, dict):
+            continue
+        for detail in plan.get("planDetail") or []:
+            if not isinstance(detail, dict):
+                continue
+            if rate is None and "rate" in detail:
+                rate = _number(detail["rate"])
+            if standing is None and "standing" in detail:
+                standing = _number(detail["standing"])
+
+    current = entry.get("currentRates")
+    if isinstance(current, dict):
+        if rate is None:
+            rate = _number(current.get("rate"))
+        if standing is None:
+            standing = _number(current.get("standingCharge"))
+
+    if rate is None and standing is None:
+        return None
+    return Tariff(unit_rate_p=rate, standing_charge_p=standing)
 
 
 class GlowmarktClient:
@@ -192,13 +257,17 @@ class GlowmarktClient:
         *,
         offset_minutes: int = 0,
         function: str = FUNCTION_SUM,
-    ) -> list[tuple[int, float]]:
+    ) -> list[tuple[int, float | None]]:
         """Return [(utc_timestamp, value)] for a resource over a time range.
 
         `start` and `end` must be naive local-wall-clock datetimes in whatever
         timezone `offset_minutes` describes. Per the API docs the offset is the
         minutes between the requested timezone and UTC, negated — so BST
         (UTC+1) is -60.
+
+        A period Glowmarkt has not collected yet comes back as None, because
+        the request sets `nulls=1`. Without it the API answers 0, which cannot
+        be told apart from a period in which nothing was used.
         """
         params = {
             "from": start.strftime(API_TIME_FORMAT),
@@ -206,6 +275,7 @@ class GlowmarktClient:
             "period": period,
             "offset": str(offset_minutes),
             "function": function,
+            "nulls": "1",
         }
         result = await self._async_get(f"/resource/{resource_id}/readings", params)
 
@@ -214,16 +284,39 @@ class GlowmarktClient:
                 f"Unexpected readings response for resource {resource_id}"
             )
 
-        readings: list[tuple[int, float]] = []
+        readings: list[tuple[int, float | None]] = []
         for row in result.get("data") or []:
             # Rows are [timestamp, value]; value is null for periods with no data.
             if not isinstance(row, (list, tuple)) or len(row) < 2:
                 continue
             timestamp, value = row[0], row[1]
-            if value is None or timestamp is None:
+            if timestamp is None or isinstance(timestamp, bool):
                 continue
             try:
-                readings.append((int(timestamp), float(value)))
+                stamp = int(timestamp)
+                readings.append((stamp, None if value is None else float(value)))
             except (TypeError, ValueError):
                 continue
         return readings
+
+    async def async_get_last_time(self, resource_id: str) -> datetime | None:
+        """Return the start of the newest reading Glowmarkt holds, in UTC.
+
+        Everything at or after this moment has not been collected yet, so the
+        importer stops there whatever the readings endpoint says.
+        """
+        result = await self._async_get(f"/resource/{resource_id}/last-time")
+        data = result.get("data") if isinstance(result, dict) else None
+        stamp = data.get("lastTs") if isinstance(data, dict) else None
+        if stamp is None or isinstance(stamp, bool):
+            return None
+        try:
+            return datetime.fromtimestamp(int(stamp), tz=UTC)
+        except (TypeError, ValueError, OverflowError):
+            return None
+
+    async def async_get_tariff(self, resource_id: str) -> Tariff | None:
+        """Return the rates the meter holds for this resource, if it has any."""
+        return _parse_tariff(
+            await self._async_get(f"/resource/{resource_id}/tariff")
+        )
