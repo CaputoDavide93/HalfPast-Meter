@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 
-from custom_components.bright_meter.api import Tariff
+from custom_components.bright_meter.api import GlowmarktConnectionError, Tariff
 
 USERNAME = "meter@example.com"
 PASSWORD = "hunter2"
@@ -131,6 +132,15 @@ class FakeGlowmarktClient:
         self.gaps: set[datetime] = set()
         self.zeros: set[datetime] = set()
         self.values_past_last_time = False
+        # Misbehaviour on demand: repeat the last row, answer newest-first,
+        # fail the Nth readings call, fail tariff or resource reads, or block
+        # every readings call on an event until a test releases it.
+        self.duplicate_last = False
+        self.reverse = False
+        self.fail_readings_call: int | None = None
+        self.tariff_errors: set[str] = set()
+        self.resources_error: Exception | None = None
+        self.readings_gate: asyncio.Event | None = None
         self.tariffs: dict[str, Tariff | None] = {
             RES_ELEC: TARIFF_ELEC,
             RES_GAS: TARIFF_GAS,
@@ -160,7 +170,13 @@ class FakeGlowmarktClient:
 
     async def async_get_resources(self, ve_id: str) -> list[dict]:
         """Return the canned resources for any virtual entity."""
-        return self.resources
+        if self.resources_error is not None:
+            raise self.resources_error
+        if ve_id == VE_ID:
+            return self.resources
+        # Resource ids are unique across an account: a second site's meters
+        # have ids of their own.
+        return [{**r, "resourceId": f"{ve_id}-{r['resourceId']}"} for r in self.resources]
 
     async def async_get_last_time(self, resource_id: str) -> datetime | None:
         """The second half-hour of the last collected hour."""
@@ -169,6 +185,8 @@ class FakeGlowmarktClient:
     async def async_get_tariff(self, resource_id: str) -> Tariff | None:
         """Return the canned rates the meter holds."""
         self.tariff_calls.append(resource_id)
+        if resource_id in self.tariff_errors:
+            raise GlowmarktConnectionError("tariff endpoint answered 404")
         return self.tariffs.get(resource_id)
 
     async def async_get_readings(
@@ -183,6 +201,10 @@ class FakeGlowmarktClient:
     ) -> list[tuple[int, float | None]]:
         """Return canned readings for the requested window."""
         self.readings_calls.append((resource_id, period))
+        if self.readings_gate is not None:
+            await self.readings_gate.wait()
+        if self.fail_readings_call == len(self.readings_calls):
+            raise GlowmarktConnectionError("readings answered 500")
         is_cost = resource_id.endswith("cost")
 
         if period == "P1D":
@@ -204,4 +226,8 @@ class FakeGlowmarktClient:
                 reading = 0.0 if self.values_past_last_time else None
             readings.append((int(cursor.timestamp()), reading))
             cursor += timedelta(hours=1)
+        if self.duplicate_last and readings:
+            readings.append(readings[-1])
+        if self.reverse:
+            readings.reverse()
         return readings

@@ -39,10 +39,10 @@ CATCHUP_INTERVAL: Final = timedelta(hours=2, minutes=5)
 # one request per resource per pass.
 REFRESH_WINDOW_HOURS: Final = 7 * 24
 
-# How far back to look for the stored running total that anchors a re-import.
-# Longer than the refresh window, so a feed that stalled for a while still
-# finds its anchor instead of rebuilding the whole series.
-ANCHOR_LOOKBACK_DAYS: Final = 30
+# How far back to look for the stored running total that anchors a re-import,
+# in widening steps: nearly always found in the first, and the last reaches past
+# the deepest history the options allow, so "not found" means there is none.
+ANCHOR_LOOKBACK_STEPS_DAYS: Final = (30, 400, MAX_BACKFILL_DAYS + 30)
 
 # How long to let an in-flight backfill finish when the entry is going away.
 # It must be allowed to finish rather than be cancelled: its recorder queries

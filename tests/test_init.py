@@ -72,8 +72,12 @@ async def test_setup_creates_sensors_for_both_fuels(
 
 def _hours_in(hass: HomeAssistant, day: date) -> int:
     zone = dt_util.get_default_time_zone()
-    start = datetime.combine(day, datetime.min.time(), zone)
-    end = datetime.combine(day + timedelta(days=1), datetime.min.time(), zone)
+    # Subtracting two datetimes that share a tzinfo is wall-clock arithmetic
+    # and always says 24; in UTC it says 23 or 25 on the clock-change days.
+    start = dt_util.as_utc(datetime.combine(day, datetime.min.time(), zone))
+    end = dt_util.as_utc(
+        datetime.combine(day + timedelta(days=1), datetime.min.time(), zone)
+    )
     return int((end - start).total_seconds() // 3600)
 
 
@@ -211,21 +215,28 @@ async def test_statistic_ids_single_installation(
 async def test_statistic_ids_disambiguated_across_installations(
     bright_env, hass: HomeAssistant, config_entry: MockConfigEntry
 ) -> None:
-    """Two installations sharing a classifier get the site name prefixed."""
+    """Two sites sharing a classifier: one readable id, one with a hash suffix.
+
+    The suffix comes from the resource id, never the site name, which is often
+    an address and would otherwise surface in diagnostics.
+    """
     client = FakeGlowmarktClient(
         virtual_entities=VIRTUAL_ENTITIES_TWO, resources=RESOURCES_ELEC_ONLY
     )
     await _setup(hass, config_entry, client)
 
-    ids = {r.statistic_id for r in config_entry.runtime_data.resources}
-    assert ids == {
-        f"{DOMAIN}:smart_home_electricity_consumption",
-        f"{DOMAIN}:smart_home_electricity_consumption_cost",
-        f"{DOMAIN}:holiday_cottage_electricity_consumption",
-        f"{DOMAIN}:holiday_cottage_electricity_consumption_cost",
-    }
-    # Four resources per site, both sites discovered.
+    ids = sorted(r.statistic_id for r in config_entry.runtime_data.resources)
     assert len(config_entry.runtime_data.resources) == 4
+    assert len(set(ids)) == 4
+    for base in (
+        f"{DOMAIN}:electricity_consumption",
+        f"{DOMAIN}:electricity_consumption_cost",
+    ):
+        plain = [i for i in ids if i == base]
+        suffixed = [i for i in ids if i.startswith(f"{base}_") and i != base]
+        suffixed = [i for i in suffixed if len(i) == len(base) + 9]
+        assert plain == [base]
+        assert len(suffixed) == 1
 
 
 async def test_unload(

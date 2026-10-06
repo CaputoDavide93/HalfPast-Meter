@@ -47,13 +47,16 @@ v0.1.2 under MIT; keep both copyright lines in `LICENSE` and the upstream
   install.
 - **Private for now**, so HACS cannot install it: `scripts/install-on-ha.sh`
   ships the committed component over SSH. It goes public once proven on a live
-  account; then add the HACS validation workflow, brand images in
-  `custom_components/bright_meter/brand/`, and scheduled CI.
+  account; then add the HACS validation workflow and scheduled CI. Brand
+  images are in `custom_components/bright_meter/brand/` (light and dark).
 - **Rules the importer keeps, each pinned by a test:** readings are requested
-  with `nulls=1`; nothing at or after `last-time` is imported; a gap is never a
-  row; a stored row a pass has no reading for is rewritten flat so the running
-  total never steps back; the last week is re-read every pass; local days are
-  built from local midnights (23/24/25 hours).
+  with `nulls=1` and malformed answers raise; nothing at or after `last-time`
+  is imported; a gap is never a row; hours are de-duplicated and summed in time
+  order; nothing is written until every read succeeded, then one batch; a stored
+  row a pass has no reading for is rewritten flat; the anchor search reaches the
+  deepest history; the last week is re-read every pass; local days are built
+  from local midnights (23/24/25 hours). Statistic ids live in
+  `statistic_ids.py`: assigned once, stored, never derived from site names.
 - **Not verified against a live account** (keep the README's list in step):
   the catch-up rate limit, which half-hour carries the standing charge in the
   cost stream, the tariff payload's real shape, and gas in m³.
