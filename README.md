@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/banner.png" alt="A lightbulb holding a small bar chart, beside half-hourly bars of electricity in amber and gas in blue." width="100%">
+
 # 💡 Bright Smart Meter for Home Assistant
 
 **Half-hourly UK smart-meter data from the Bright app's DCC feed, filed in Home Assistant at the hour it happened, whoever your supplier is**
@@ -18,10 +20,11 @@
 | | Feature | What it does |
 |---|---|---|
 | 📈 | Energy dashboard history | Imports electricity, gas and their cost as hourly external statistics, each hour placed where it happened, however late the reading lands |
-| 🕳️ | Gaps stay gaps | Asks Glowmarkt to mark uncollected half-hours (`nulls=1`) and stops at its newest reading (`last-time`), so a missing hour is never stored as zero use, and a real zero is imported at once |
-| 🔁 | Late data repaired | Re-reads the last week on every pass; revised and late readings replace what was stored, and the running total never steps backwards |
+| 🕳️ | Gaps stay gaps | Asks Glowmarkt to mark uncollected half-hours (`nulls=1`) and stops at its newest reading (`last-time`): a missing hour gets no row, and a real zero is imported at once. An hour stored earlier that later comes back missing is kept flat (zero that hour) rather than deleted |
+| 🔁 | Late data repaired | Re-reads the last week on every pass. Every chunk is read and checked before anything is written, then the rewrite goes in as one batch, so revised readings replace what was stored and the running total does not step backwards |
 | 🗓️ | Last full day | Yesterday's total once every hour of it is in, built from local midnights so the 23- and 25-hour clock-change days come out right |
 | 🏷️ | Meter tariff | The unit rate and standing charge the meter itself holds, per fuel, so you can see whether a new supplier's rates have reached it |
+| 🪪 | Stable statistic ids | Each meter stream keeps the id it was first given, so adding a site or a second account never renames, or writes into, an existing history |
 | 🧾 | First import | Up to a year of history on setup (configurable to ten), in 30-day chunks |
 | 🔐 | Reauthentication | A password changed in the Bright app asks to be re-entered instead of failing silently |
 | 🩺 | Diagnostics | How far each stream reaches, its last full day and tariff, with no email, password, meter ids or site name |
@@ -146,14 +149,14 @@ The supplier has not sent a rate to the meter over the DCC, or has not yet after
 ```text
 Bright-Home-Assistant/
 ├── custom_components/
-│   └── bright_meter/        # 🧩 the integration: API client, coordinator, sensors, flows
+│   └── bright_meter/        # 🧩 the integration: API client, coordinator, sensors, flows, brand icons
 ├── tests/                   # 🧪 pytest against Home Assistant 2026.9.4
 ├── scripts/
 │   └── install-on-ha.sh     # 📦 ship the committed component to an HA host over SSH
 ├── tools/
 │   ├── gen_diagram.py       # 🗺️ draws docs/assets/architecture-*.svg
 │   └── gen_docs.py          # 🤖 the README's statistics and sensor tables
-├── docs/assets/             # 🖼️ architecture diagram, light and dark
+├── docs/assets/             # 🖼️ banner, and the architecture diagram light and dark
 ├── .github/                 # 🤖 tests + hassfest workflows, dependabot
 ├── Makefile                 # 🔧 venv, check, test, lint, diagram, install
 ├── .env.example             # ⚙️ the install script's SSH target
