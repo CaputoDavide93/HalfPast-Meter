@@ -12,7 +12,7 @@ from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
-    OptionsFlow,
+    OptionsFlowWithReload,
 )
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
@@ -126,13 +126,13 @@ class GlowmarktConfigFlow(ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlowWithReload:
         """Return the options flow."""
         return GlowmarktOptionsFlow()
 
 
-class GlowmarktOptionsFlow(OptionsFlow):
-    """Lets the initial backfill depth be changed after setup."""
+class GlowmarktOptionsFlow(OptionsFlowWithReload):
+    """Lets the history depth be changed after setup; saving reloads the entry."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None

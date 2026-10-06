@@ -160,3 +160,37 @@ async def test_reauth_rejects_bad_password(
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "invalid_auth"}
     assert config_entry.data[CONF_PASSWORD] == PASSWORD
+
+
+async def test_reauth_on_a_loaded_entry_uses_no_update_listener(
+    bright_env, hass: HomeAssistant, config_entry: MockConfigEntry, caplog
+) -> None:
+    """Reauth reloads the entry itself, so no update listener may also do it.
+
+    The pair was deprecated in HA 2026.6 and stops working in 2026.12: the
+    options reload now comes from OptionsFlowWithReload instead.
+    """
+    from .const import FakeGlowmarktClient
+
+    config_entry.add_to_hass(hass)
+    with patch(
+        "custom_components.bright_meter.GlowmarktClient",
+        return_value=FakeGlowmarktClient(),
+    ):
+        assert await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+        await config_entry.runtime_data.async_wait_for_backfill()
+
+        assert not config_entry.update_listeners
+
+        result = await config_entry.start_reauth_flow(hass)
+        with patch(CLIENT_PATH, return_value=_mock_client()):
+            result = await hass.config_entries.flow.async_configure(
+                result["flow_id"], {CONF_PASSWORD: "new-password"}
+            )
+        await hass.async_block_till_done()
+        await config_entry.runtime_data.async_wait_for_backfill()
+        await hass.async_block_till_done()
+
+    assert result["reason"] == "reauth_successful"
+    assert "update listener" not in caplog.text

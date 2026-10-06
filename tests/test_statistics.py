@@ -108,14 +108,17 @@ async def test_increasing_depth_rebuilds_the_series(
     assert shallow
     shallow_earliest = dt_util.utc_from_timestamp(shallow[0]["start"])
 
-    # Ask for more history; the update listener reloads the entry.
+    # Ask for more history through the options flow, which reloads the entry.
     with patch(
         "custom_components.bright_meter.GlowmarktClient",
         return_value=FakeGlowmarktClient(),
     ):
-        hass.config_entries.async_update_entry(entry, options={CONF_BACKFILL_DAYS: 4})
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        await hass.config_entries.options.async_configure(
+            result["flow_id"], {CONF_BACKFILL_DAYS: 4}
+        )
         await hass.async_block_till_done()
-    await async_wait_recording_done(hass)
+        await _settle(hass, entry)
 
     deep = await _rows(hass)
     deep_earliest = dt_util.utc_from_timestamp(deep[0]["start"])
