@@ -2,19 +2,28 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime, timedelta
 from unittest.mock import patch
+
+import pytest
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_util
 
+from custom_components.bright_meter.api import GlowmarktAuthError
 from custom_components.bright_meter.const import DOMAIN
 
 from .const import (
-    DAILY_COST,
-    DAILY_ENERGY,
+    HOURLY_COST,
+    HOURLY_ENERGY,
+    RES_ELEC,
+    RES_ELEC_COST,
+    RES_GAS,
     RESOURCES_ELEC_ONLY,
+    TARIFF_ELEC,
     VIRTUAL_ENTITIES_TWO,
     FakeGlowmarktClient,
 )
@@ -36,36 +45,121 @@ async def _setup(
 async def test_setup_creates_sensors_for_both_fuels(
     bright_env, hass: HomeAssistant, config_entry: MockConfigEntry
 ) -> None:
-    """A dual-fuel account gets four sensors, and reactive power is ignored."""
+    """A dual-fuel account gets ten sensors, and reactive power is ignored.
+
+    Per fuel: the last full day, how far the data reaches, the unit rate and
+    the standing charge, plus the last full day of its cost.
+    """
     client = FakeGlowmarktClient()
     await _setup(hass, config_entry, client)
 
     assert config_entry.state is ConfigEntryState.LOADED
 
-    entities = [
+    entities = sorted(
         eid for eid in hass.states.async_entity_ids("sensor") if "smart_home" in eid
+    )
+    assert entities == [
+        "sensor.smart_home_electricity_cost_last_full_day",
+        "sensor.smart_home_electricity_data_until",
+        "sensor.smart_home_electricity_last_full_day",
+        "sensor.smart_home_electricity_standing_charge",
+        "sensor.smart_home_electricity_unit_rate",
+        "sensor.smart_home_gas_cost_last_full_day",
+        "sensor.smart_home_gas_data_until",
+        "sensor.smart_home_gas_last_full_day",
+        "sensor.smart_home_gas_standing_charge",
+        "sensor.smart_home_gas_unit_rate",
     ]
-    assert len(entities) == 4
-
-    # electricity.import.reactive is only meaningful for large non-domestic
-    # sites and must never produce an entity.
-    assert not any("reactive" in eid for eid in entities)
-    assert hass.states.get("sensor.smart_home_electricity_today") is not None
-    assert hass.states.get("sensor.smart_home_gas_today") is not None
 
 
-async def test_energy_and_cost_values(
+def _hours_in(hass: HomeAssistant, day: date) -> int:
+    zone = dt_util.get_default_time_zone()
+    start = datetime.combine(day, datetime.min.time(), zone)
+    end = datetime.combine(day + timedelta(days=1), datetime.min.time(), zone)
+    return int((end - start).total_seconds() // 3600)
+
+
+async def test_last_full_day_values(
     bright_env, hass: HomeAssistant, config_entry: MockConfigEntry
 ) -> None:
-    """Energy passes through as kWh; cost converts from pence to pounds."""
+    """Yesterday, whole, in kWh and pounds, with the day it covers."""
     await _setup(hass, config_entry, FakeGlowmarktClient())
 
-    energy = hass.states.get("sensor.smart_home_electricity_today")
-    assert float(energy.state) == DAILY_ENERGY
+    energy = hass.states.get("sensor.smart_home_electricity_last_full_day")
+    day = date.fromisoformat(energy.attributes["day"])
+    assert day == dt_util.now().date() - timedelta(days=1)
+    hours = _hours_in(hass, day)
+    assert float(energy.state) == pytest.approx(hours * HOURLY_ENERGY)
+    assert energy.attributes["statistic_id"] == f"{DOMAIN}:electricity_consumption"
 
-    cost = hass.states.get("sensor.smart_home_electricity_cost_today")
-    assert float(cost.state) == DAILY_COST / 100
+    cost = hass.states.get("sensor.smart_home_electricity_cost_last_full_day")
+    assert float(cost.state) == pytest.approx(hours * HOURLY_COST / 100)
     assert cost.attributes["unit_of_measurement"] == "GBP"
+
+
+async def test_data_until_is_the_end_of_the_newest_whole_hour(
+    bright_env, hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """The edge of the data, so a stalled feed shows as a date, not as zero."""
+    await _setup(hass, config_entry, FakeGlowmarktClient())
+
+    state = hass.states.get("sensor.smart_home_electricity_data_until")
+    now_hour = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+    assert dt_util.parse_datetime(state.state) == now_hour
+
+
+async def test_tariff_sensors_in_pounds(
+    bright_env, hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """The rates the meter holds, converted from pence."""
+    await _setup(hass, config_entry, FakeGlowmarktClient())
+
+    def value(entity_id: str) -> float:
+        return float(hass.states.get(entity_id).state)
+
+    assert value("sensor.smart_home_electricity_unit_rate") == pytest.approx(0.2446)
+    assert value("sensor.smart_home_electricity_standing_charge") == pytest.approx(
+        0.4966
+    )
+    assert value("sensor.smart_home_gas_unit_rate") == pytest.approx(0.0862)
+    assert value("sensor.smart_home_gas_standing_charge") == pytest.approx(0.1253)
+    assert (
+        hass.states.get("sensor.smart_home_gas_unit_rate").attributes[
+            "unit_of_measurement"
+        ]
+        == "GBP/kWh"
+    )
+
+
+async def test_tariff_falls_back_to_the_cost_stream(
+    bright_env, hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """Which stream answers the tariff call is undocumented, so both are asked."""
+    client = FakeGlowmarktClient()
+    client.tariffs = {RES_ELEC: None, RES_ELEC_COST: TARIFF_ELEC, RES_GAS: None}
+    await _setup(hass, config_entry, client)
+
+    assert float(
+        hass.states.get("sensor.smart_home_electricity_unit_rate").state
+    ) == pytest.approx(0.2446)
+    # Neither gas stream has one: unknown, not zero.
+    assert hass.states.get("sensor.smart_home_gas_unit_rate").state == "unknown"
+
+
+async def test_tariff_is_read_a_few_times_a_day_not_every_poll(
+    bright_env, hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """A refresh inside six hours does not ask for the tariff again."""
+    client = FakeGlowmarktClient()
+    await _setup(hass, config_entry, client)
+    calls = len(client.tariff_calls)
+    assert calls
+
+    await config_entry.runtime_data.async_refresh()
+    await config_entry.runtime_data.async_wait_for_backfill()
+    await hass.async_block_till_done()
+
+    assert len(client.tariff_calls) == calls
 
 
 async def test_sensors_have_no_state_class(
@@ -73,13 +167,31 @@ async def test_sensors_have_no_state_class(
 ) -> None:
     """Statistics come from the API import, so entities must not generate them.
 
-    A state_class here would make the recorder produce a second, shorter series
-    for the same data.
+    A state_class here would make the recorder produce a second series for the
+    same energy, and adding both to the Energy dashboard would count it twice.
     """
     await _setup(hass, config_entry, FakeGlowmarktClient())
 
-    state = hass.states.get("sensor.smart_home_electricity_today")
-    assert "state_class" not in state.attributes
+    for entity_id in hass.states.async_entity_ids("sensor"):
+        assert "state_class" not in hass.states.get(entity_id).attributes, entity_id
+
+
+async def test_rejected_password_starts_reauth(
+    bright_env, hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """A password changed in the Bright app asks to be re-entered."""
+    client = FakeGlowmarktClient()
+    await _setup(hass, config_entry, client)
+
+    async def rejected(resource_id: str) -> None:
+        raise GlowmarktAuthError("rejected")
+
+    client.async_get_last_time = rejected
+    await config_entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+
+    flows = hass.config_entries.flow.async_progress_by_handler(DOMAIN)
+    assert [flow["context"]["source"] for flow in flows] == ["reauth"]
 
 
 async def test_statistic_ids_single_installation(

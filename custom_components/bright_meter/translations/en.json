@@ -2,40 +2,90 @@
   "config": {
     "step": {
       "user": {
-        "title": "Glowmarkt (Bright)",
+        "title": "Bright smart meter",
         "description": "Sign in with the account you use for the Bright app. Your smart meter must already be set up and verified in Bright.",
         "data": {
           "username": "Email address",
           "password": "Password"
+        },
+        "data_description": {
+          "username": "The email you sign in to the Bright app with.",
+          "password": "Your Bright app password. It is stored in Home Assistant only."
         }
       },
       "reauth_confirm": {
-        "title": "Reauthenticate Glowmarkt",
+        "title": "Reconnect Bright",
         "description": "The password for {username} is no longer working. Enter it again to reconnect.",
         "data": {
           "password": "Password"
+        },
+        "data_description": {
+          "password": "Your current Bright app password."
         }
       }
     },
     "error": {
-      "cannot_connect": "Could not reach the Glowmarkt API. Check your internet connection and try again.",
-      "invalid_auth": "Those credentials were rejected. Use the same email and password as the Bright app.",
+      "cannot_connect": "Could not reach Bright (api.glowmarkt.com). Check the internet connection and try again.",
+      "invalid_auth": "Bright rejected those details. Use the same email and password as the Bright app.",
       "no_meters": "Signed in successfully, but no meters were found on this account. Complete meter setup in the Bright app first.",
       "unknown": "Something unexpected went wrong. Check the Home Assistant log for details."
     },
     "abort": {
-      "already_configured": "This Glowmarkt account is already set up.",
-      "reauth_successful": "Glowmarkt reconnected successfully."
+      "already_configured": "This Bright account is already set up.",
+      "reauth_successful": "Bright reconnected."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Glowmarkt options",
-        "description": "How far back to reach the first time statistics are imported. Existing statistics are never re-fetched, so raising this later only pulls in the extra history.",
+        "title": "Bright options",
+        "description": "How many days of history to import. The last week is re-read on every pass, because readings arrive late.",
         "data": {
           "backfill_days": "Days of history to import"
+        },
+        "data_description": {
+          "backfill_days": "Raising it clears the imported history and rebuilds it from the new depth. Lowering it keeps what is already imported."
         }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "electricity_consumption_last_day": {
+        "name": "Electricity last full day"
+      },
+      "electricity_consumption_cost_last_day": {
+        "name": "Electricity cost last full day"
+      },
+      "electricity_export_last_day": {
+        "name": "Export last full day"
+      },
+      "gas_consumption_last_day": {
+        "name": "Gas last full day"
+      },
+      "gas_consumption_cost_last_day": {
+        "name": "Gas cost last full day"
+      },
+      "electricity_consumption_data_until": {
+        "name": "Electricity data until"
+      },
+      "electricity_export_data_until": {
+        "name": "Export data until"
+      },
+      "gas_consumption_data_until": {
+        "name": "Gas data until"
+      },
+      "electricity_unit_rate": {
+        "name": "Electricity unit rate"
+      },
+      "electricity_standing_charge": {
+        "name": "Electricity standing charge"
+      },
+      "gas_unit_rate": {
+        "name": "Gas unit rate"
+      },
+      "gas_standing_charge": {
+        "name": "Gas standing charge"
       }
     }
   }

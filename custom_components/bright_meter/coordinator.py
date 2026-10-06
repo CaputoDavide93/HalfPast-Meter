@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta, tzinfo
 from typing import Any
 
 from homeassistant.components.recorder import get_instance
@@ -29,7 +29,13 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util, slugify
 from homeassistant.util.unit_conversion import EnergyConverter
 
-from .api import GlowmarktAuthError, GlowmarktClient, GlowmarktConnectionError
+from .api import (
+    GlowmarktAuthError,
+    GlowmarktClient,
+    GlowmarktConnectionError,
+    GlowmarktError,
+    Tariff,
+)
 from .const import (
     ANCHOR_LOOKBACK_DAYS,
     BACKFILL_SHUTDOWN_TIMEOUT,
@@ -40,10 +46,10 @@ from .const import (
     DOMAIN,
     HOURLY_CHUNK_DAYS,
     PENCE_PER_POUND,
-    PERIOD_DAILY,
     PERIOD_HOURLY,
     REFRESH_WINDOW_HOURS,
     SUPPORTED_CLASSIFIERS,
+    TARIFF_INTERVAL,
     UPDATE_INTERVAL,
     ClassifierInfo,
 )
@@ -68,8 +74,65 @@ class GlowmarktResource:
     statistic_id: str
 
 
-class GlowmarktCoordinator(DataUpdateCoordinator[dict[str, float | None]]):
-    """Polls today's totals and keeps long-term statistics backfilled."""
+@dataclass(frozen=True, kw_only=True)
+class DayTotal:
+    """One whole local day of a stream, every hour of it collected."""
+
+    day: date
+    value: float
+
+
+@dataclass(frozen=True, kw_only=True)
+class BrightData:
+    """What the entities show, keyed by resource id.
+
+    Nothing here is "today so far": the DCC feed is at least half an hour late
+    and often a day, so a running total for today is wrong more often than
+    right. The entities say instead how far the data reaches, the last whole
+    day, and the rates the meter holds.
+    """
+
+    data_until: dict[str, datetime | None] = field(default_factory=dict)
+    last_day: dict[str, DayTotal | None] = field(default_factory=dict)
+    tariffs: dict[str, Tariff | None] = field(default_factory=dict)
+
+
+def last_full_day(
+    hourly: dict[datetime, float | None],
+    data_until: datetime | None,
+    time_zone: tzinfo,
+    now: datetime,
+) -> DayTotal | None:
+    """The newest local day whose every hour is in `hourly`, summed.
+
+    Local days are 23, 24 or 25 hours long across the clock changes, so they
+    are built from local midnights rather than by counting 24 hours. A day with
+    a gap anywhere in it is skipped rather than reported short.
+    """
+    if data_until is None or not hourly:
+        return None
+    day = now.astimezone(time_zone).date()
+    earliest = min(hourly).astimezone(time_zone).date()
+    while day >= earliest:
+        day -= timedelta(days=1)
+        start = dt_util.as_utc(datetime.combine(day, datetime.min.time(), time_zone))
+        end = dt_util.as_utc(
+            datetime.combine(day + timedelta(days=1), datetime.min.time(), time_zone)
+        )
+        if end > data_until:
+            continue
+        hours = []
+        moment = start
+        while moment < end:
+            hours.append(hourly.get(moment))
+            moment += timedelta(hours=1)
+        if hours and all(value is not None for value in hours):
+            return DayTotal(day=day, value=round(sum(hours), 6))
+    return None
+
+
+class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
+    """Keeps long-term statistics backfilled and reports the meter's tariff."""
 
     def __init__(
         self,
@@ -103,6 +166,9 @@ class GlowmarktCoordinator(DataUpdateCoordinator[dict[str, float | None]]):
         # values of the refresh window (None for a gap), from the last backfill.
         self._last_times: dict[str, datetime | None] = {}
         self._recent: dict[str, dict[datetime, float | None]] = {}
+        self._data_until: dict[str, datetime | None] = {}
+        self._tariffs: dict[str, Tariff | None] = {}
+        self._tariffs_read: datetime | None = None
 
     @property
     def _backfill_days(self) -> int:
@@ -185,42 +251,89 @@ class GlowmarktCoordinator(DataUpdateCoordinator[dict[str, float | None]]):
             ", ".join(r.statistic_id for r in self.resources),
         )
 
-    async def _async_update_data(self) -> dict[str, float | None]:
-        """Fetch today's running total for each resource."""
-        now = dt_util.now()
-        midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    async def _async_update_data(self) -> BrightData:
+        """Ask how far each stream's data reaches, and start the import.
 
-        # The API wants the offset between the requested timezone and UTC,
-        # negated: BST (UTC+1) is -60.
-        utc_offset = now.utcoffset() or timedelta(0)
-        offset_minutes = -int(utc_offset.total_seconds() // 60)
-
+        The `last-time` calls are cheap, one per stream, and they are what
+        surfaces a rejected password or an unreachable API on every poll.
+        """
         await self._async_catchup_if_due()
 
-        values: dict[str, float | None] = {}
         try:
             for resource in self.resources:
-                readings = await self.client.async_get_readings(
-                    resource.resource_id,
-                    midnight.replace(tzinfo=None),
-                    now.replace(tzinfo=None),
-                    PERIOD_DAILY,
-                    offset_minutes=offset_minutes,
+                self._last_times[resource.resource_id] = (
+                    await self.client.async_get_last_time(resource.resource_id)
                 )
-                value = readings[0][1] if readings else None
-                if value is not None and resource.info.is_cost:
-                    value = value / PENCE_PER_POUND
-                values[resource.resource_id] = value
+            await self._async_read_tariffs_if_due()
         except GlowmarktAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except GlowmarktConnectionError as err:
             raise UpdateFailed(str(err)) from err
 
         # Statistics run separately so a slow first backfill never delays or
-        # fails the entity update.
+        # fails the entity update; it publishes its results when it finishes.
         self._schedule_backfill()
 
-        return values
+        return self._snapshot()
+
+    def _snapshot(self) -> BrightData:
+        """The entity view of what the last import and tariff read found."""
+        time_zone = dt_util.get_default_time_zone()
+        now = dt_util.utcnow()
+        return BrightData(
+            data_until=dict(self._data_until),
+            last_day={
+                resource.resource_id: last_full_day(
+                    self._recent.get(resource.resource_id, {}),
+                    self._data_until.get(resource.resource_id),
+                    time_zone,
+                    now,
+                )
+                for resource in self.resources
+            },
+            tariffs=dict(self._tariffs),
+        )
+
+    async def _async_read_tariffs_if_due(self) -> None:
+        """Read the rates the meter holds for each fuel, a few times a day.
+
+        Asked of the consumption stream first and the cost stream second: which
+        of the two answers is not documented. A read that fails keeps the last
+        known rates rather than blanking them.
+        """
+        now = dt_util.utcnow()
+        if (
+            self._tariffs_read is not None
+            and now - self._tariffs_read < TARIFF_INTERVAL
+        ):
+            return
+        self._tariffs_read = now
+
+        for consumption in self.resources:
+            if consumption.info.is_cost or consumption.info.fuel is None:
+                continue
+            candidates = [consumption] + [
+                r
+                for r in self.resources
+                if r.info.is_cost
+                and r.info.fuel == consumption.info.fuel
+                and r.ve_id == consumption.ve_id
+            ]
+            tariff: Tariff | None = None
+            for candidate in candidates:
+                try:
+                    tariff = await self.client.async_get_tariff(candidate.resource_id)
+                except GlowmarktAuthError:
+                    raise
+                except GlowmarktError as err:
+                    _LOGGER.debug(
+                        "Tariff read for %s failed: %s", candidate.statistic_id, err
+                    )
+                    tariff = self._tariffs.get(consumption.resource_id)
+                    break
+                if tariff is not None:
+                    break
+            self._tariffs[consumption.resource_id] = tariff
 
     def _schedule_backfill(self) -> None:
         """Start a backfill unless one is running or Home Assistant is stopping."""
@@ -354,8 +467,17 @@ class GlowmarktCoordinator(DataUpdateCoordinator[dict[str, float | None]]):
         """Run the backfill, swallowing errors so the task never explodes."""
         try:
             await self.async_backfill()
+        except GlowmarktAuthError:
+            # The poll would raise this too, but say so now rather than in
+            # thirty minutes: it starts the reauthentication flow.
+            self.config_entry.async_start_reauth(self.hass)
+        except GlowmarktConnectionError as err:
+            _LOGGER.warning("Glowmarkt statistics import stopped: %s", err)
         except Exception:  # noqa: BLE001 - background task of last resort
             _LOGGER.exception("Glowmarkt statistics backfill failed")
+        finally:
+            if not self.hass.is_stopping:
+                self.async_set_updated_data(self._snapshot())
 
     async def async_backfill(self) -> None:
         """Bring long-term statistics up to date for every resource."""
@@ -397,6 +519,8 @@ class GlowmarktCoordinator(DataUpdateCoordinator[dict[str, float | None]]):
         # Never import the hour in progress: it is still accumulating.
         current_hour = now.replace(minute=0, second=0, microsecond=0)
 
+        # Asked again rather than reusing the poll's answer: a backfill can be
+        # started on its own, and the edge may have moved since.
         last_time = await self.client.async_get_last_time(resource.resource_id)
         self._last_times[resource.resource_id] = last_time
         if last_time is None:
@@ -410,6 +534,7 @@ class GlowmarktCoordinator(DataUpdateCoordinator[dict[str, float | None]]):
             )
             + timedelta(hours=1),
         )
+        self._data_until[resource.resource_id] = data_until
 
         requested_days = self._backfill_days
         applied_days = self._depth_applied.get(statistic_id, 0)

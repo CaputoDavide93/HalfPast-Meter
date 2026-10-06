@@ -50,8 +50,11 @@ ANCHOR_LOOKBACK_DAYS: Final = 30
 # against a database the recorder is already disposing of.
 BACKFILL_SHUTDOWN_TIMEOUT: Final = 30
 
+# The meter's tariff changes rarely (a switch, a cap, a new fix), so it is read
+# a few times a day rather than on every poll.
+TARIFF_INTERVAL: Final = timedelta(hours=6)
+
 PERIOD_HOURLY: Final = "PT1H"
-PERIOD_DAILY: Final = "P1D"
 FUNCTION_SUM: Final = "sum"
 
 # Glowmarkt reports money in pence; Home Assistant wants major units.
@@ -66,6 +69,8 @@ class ClassifierInfo:
     label: str
     is_cost: bool
     icon: str
+    # The fuel whose tariff this stream is priced at; None for export.
+    fuel: str | None
 
 
 # Only classifiers listed here produce entities and statistics. Reactive-power
@@ -73,16 +78,24 @@ class ClassifierInfo:
 # deliberately omitted: they are only meaningful for large non-domestic sites.
 SUPPORTED_CLASSIFIERS: Final[dict[str, ClassifierInfo]] = {
     "electricity.consumption": ClassifierInfo(
-        label="Electricity", is_cost=False, icon="mdi:flash"
+        label="Electricity", is_cost=False, icon="mdi:flash", fuel="electricity"
     ),
     "electricity.consumption.cost": ClassifierInfo(
-        label="Electricity cost", is_cost=True, icon="mdi:currency-gbp"
+        label="Electricity cost",
+        is_cost=True,
+        icon="mdi:currency-gbp",
+        fuel="electricity",
     ),
     "electricity.export": ClassifierInfo(
-        label="Electricity export", is_cost=False, icon="mdi:transmission-tower-export"
+        label="Electricity export",
+        is_cost=False,
+        icon="mdi:transmission-tower-export",
+        fuel=None,
     ),
-    "gas.consumption": ClassifierInfo(label="Gas", is_cost=False, icon="mdi:fire"),
+    "gas.consumption": ClassifierInfo(
+        label="Gas", is_cost=False, icon="mdi:fire", fuel="gas"
+    ),
     "gas.consumption.cost": ClassifierInfo(
-        label="Gas cost", is_cost=True, icon="mdi:currency-gbp"
+        label="Gas cost", is_cost=True, icon="mdi:currency-gbp", fuel="gas"
     ),
 }
