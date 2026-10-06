@@ -8,10 +8,10 @@
   "dependencies": [
     "recorder"
   ],
-  "documentation": "https://github.com/CaputoDavide93/HomeAssistant-Stack/blob/main/docs/05-reference/energy.md",
+  "documentation": "https://github.com/CaputoDavide93/Bright-Home-Assistant",
   "integration_type": "service",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/CaputoDavide93/HomeAssistant-Stack/issues",
+  "issue_tracker": "https://github.com/CaputoDavide93/Bright-Home-Assistant/issues",
   "requirements": [],
   "version": "0.2.0"
 }

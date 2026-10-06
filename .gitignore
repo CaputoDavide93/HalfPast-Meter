@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtualenvs (a directory or a symlink)
+.venv
+venv/
+
+# Local settings for scripts/install-on-ha.sh
+.env
+
+# OS / editor
+.DS_Store
+.vscode/
+*.code-workspace
