@@ -1,0 +1,17 @@
+{
+  "domain": "bright_meter",
+  "name": "Bright Smart Meter",
+  "codeowners": [
+    "@CaputoDavide93"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "recorder"
+  ],
+  "documentation": "https://github.com/CaputoDavide93/HomeAssistant-Stack/blob/main/docs/05-reference/energy.md",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/CaputoDavide93/HomeAssistant-Stack/issues",
+  "requirements": [],
+  "version": "0.2.0"
+}
