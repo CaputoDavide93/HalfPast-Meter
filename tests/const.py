@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from custom_components.bright_meter.api import Tariff
 
@@ -10,7 +10,7 @@ USERNAME = "meter@example.com"
 PASSWORD = "hunter2"
 
 # Well past any test run, so the client never decides the token is stale.
-TOKEN_EXP = int(datetime(2099, 1, 1, tzinfo=timezone.utc).timestamp())
+TOKEN_EXP = int(datetime(2099, 1, 1, tzinfo=UTC).timestamp())
 
 AUTH_OK = {
     "valid": True,

@@ -26,7 +26,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.util import dt as dt_util, slugify
+from homeassistant.util import dt as dt_util
+from homeassistant.util import slugify
 from homeassistant.util.unit_conversion import EnergyConverter
 
 from .api import (
@@ -473,7 +474,7 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
             self.config_entry.async_start_reauth(self.hass)
         except GlowmarktConnectionError as err:
             _LOGGER.warning("Glowmarkt statistics import stopped: %s", err)
-        except Exception:  # noqa: BLE001 - background task of last resort
+        except Exception:
             _LOGGER.exception("Glowmarkt statistics backfill failed")
         finally:
             if not self.hass.is_stopping:

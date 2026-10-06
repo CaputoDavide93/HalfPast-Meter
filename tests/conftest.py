@@ -7,9 +7,8 @@ from collections.abc import Generator
 from unittest.mock import patch
 
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
-
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.bright_meter.const import CONF_BACKFILL_DAYS, DOMAIN
 

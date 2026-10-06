@@ -5,10 +5,9 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
-
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.bright_meter.api import (
     GlowmarktAuthError,

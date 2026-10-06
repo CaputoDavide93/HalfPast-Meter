@@ -6,12 +6,10 @@ from datetime import date, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
-
-from pytest_homeassistant_custom_component.common import MockConfigEntry
-
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.bright_meter.api import GlowmarktAuthError
 from custom_components.bright_meter.const import DOMAIN

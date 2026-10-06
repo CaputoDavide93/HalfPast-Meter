@@ -7,7 +7,6 @@ from collections.abc import Mapping
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -70,7 +69,7 @@ class GlowmarktConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_auth"
             except GlowmarktConnectionError:
                 errors["base"] = "cannot_connect"
-            except Exception:  # noqa: BLE001
+            except Exception:
                 _LOGGER.exception("Unexpected error validating Glowmarkt credentials")
                 errors["base"] = "unknown"
             else:
@@ -106,7 +105,7 @@ class GlowmarktConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_auth"
             except GlowmarktConnectionError:
                 errors["base"] = "cannot_connect"
-            except Exception:  # noqa: BLE001
+            except Exception:
                 _LOGGER.exception("Unexpected error during Glowmarkt reauth")
                 errors["base"] = "unknown"
             else:

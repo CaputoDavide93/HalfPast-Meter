@@ -5,12 +5,11 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
+from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.components.diagnostics import (
     get_diagnostics_for_config_entry,
 )
-
-from homeassistant.core import HomeAssistant
 
 from .const import PASSWORD, RES_ELEC, USERNAME, VE_ID, FakeGlowmarktClient
 

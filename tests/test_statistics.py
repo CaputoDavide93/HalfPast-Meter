@@ -7,16 +7,16 @@ part most likely to break quietly, so it is tested against a real recorder.
 from __future__ import annotations
 
 from datetime import timedelta
+from itertools import pairwise
 from unittest.mock import patch
-
-from pytest_homeassistant_custom_component.common import MockConfigEntry
-from pytest_homeassistant_custom_component.components.recorder.common import (
-    async_wait_recording_done,
-)
 
 from homeassistant.components.recorder.statistics import statistics_during_period
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.components.recorder.common import (
+    async_wait_recording_done,
+)
 
 from custom_components.bright_meter.const import CONF_BACKFILL_DAYS, DOMAIN
 
@@ -306,7 +306,7 @@ async def test_stale_rows_past_the_data_are_flattened(
     await async_wait_recording_done(hass)
 
     def deltas(rows: list[dict]) -> list[float]:
-        return [b["sum"] - a["sum"] for a, b in zip(rows, rows[1:])]
+        return [b["sum"] - a["sum"] for a, b in pairwise(rows)]
 
     assert min(deltas(await _rows(hass))) < 0, "test did not reproduce the fault"
 
@@ -417,7 +417,7 @@ async def test_an_hour_that_goes_missing_again_does_not_step_backwards(
     await _settle(hass, entry)
 
     rows = await _rows(hass)
-    deltas = [b["sum"] - a["sum"] for a, b in zip(rows, rows[1:])]
+    deltas = [b["sum"] - a["sum"] for a, b in pairwise(rows)]
     assert min(deltas) >= 0
     assert rows[-1]["sum"] == (len(rows) - 1) * HOURLY_ENERGY
 
