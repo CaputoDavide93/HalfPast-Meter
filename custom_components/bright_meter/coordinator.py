@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, tzinfo
@@ -27,7 +26,6 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
-from homeassistant.util import slugify
 from homeassistant.util.unit_conversion import EnergyConverter
 
 from .api import (
@@ -38,7 +36,7 @@ from .api import (
     Tariff,
 )
 from .const import (
-    ANCHOR_LOOKBACK_DAYS,
+    ANCHOR_LOOKBACK_STEPS_DAYS,
     BACKFILL_SHUTDOWN_TIMEOUT,
     CATCHUP_INTERVAL,
     CONF_BACKFILL_DAYS,
@@ -54,6 +52,7 @@ from .const import (
     UPDATE_INTERVAL,
     ClassifierInfo,
 )
+from .statistic_ids import async_assign_statistic_ids
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -195,6 +194,8 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
             ve_name = entity.get("name") or "Glowmarkt"
             try:
                 resources = await self.client.async_get_resources(ve_id)
+            except GlowmarktAuthError as err:
+                raise ConfigEntryAuthFailed(str(err)) from err
             except GlowmarktConnectionError as err:
                 raise UpdateFailed(str(err)) from err
 
@@ -216,30 +217,23 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
                     }
                 )
 
-        # Keep statistic IDs short and readable in the single-installation case,
-        # which is nearly everyone, but disambiguate by installation name when
-        # the same classifier shows up more than once.
-        classifier_counts: dict[str, int] = {}
-        for item in discovered:
-            classifier_counts[item["classifier"]] = (
-                classifier_counts.get(item["classifier"], 0) + 1
+        # Each resource keeps the statistic id it was first given; see
+        # statistic_ids.py for why an id must never change.
+        statistic_ids = await async_assign_statistic_ids(
+            self.hass,
+            [(item["resource_id"], item["classifier"]) for item in discovered],
+        )
+        self.resources = [
+            GlowmarktResource(
+                resource_id=item["resource_id"],
+                ve_id=item["ve_id"],
+                ve_name=item["ve_name"],
+                classifier=item["classifier"],
+                info=item["info"],
+                statistic_id=statistic_ids[item["resource_id"]],
             )
-
-        self.resources = []
-        for item in discovered:
-            slug = slugify(item["classifier"])
-            if classifier_counts[item["classifier"]] > 1:
-                slug = f"{slugify(item['ve_name'])}_{slug}"
-            self.resources.append(
-                GlowmarktResource(
-                    resource_id=item["resource_id"],
-                    ve_id=item["ve_id"],
-                    ve_name=item["ve_name"],
-                    classifier=item["classifier"],
-                    info=item["info"],
-                    statistic_id=f"{DOMAIN}:{slug}",
-                )
-            )
+            for item in discovered
+        ]
 
         if not self.resources:
             raise UpdateFailed(
@@ -321,19 +315,25 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
                 and r.ve_id == consumption.ve_id
             ]
             tariff: Tariff | None = None
+            failed = False
             for candidate in candidates:
                 try:
                     tariff = await self.client.async_get_tariff(candidate.resource_id)
                 except GlowmarktAuthError:
                     raise
                 except GlowmarktError as err:
+                    # One stream failing says nothing about the other: try it.
                     _LOGGER.debug(
                         "Tariff read for %s failed: %s", candidate.statistic_id, err
                     )
-                    tariff = self._tariffs.get(consumption.resource_id)
-                    break
+                    failed = True
+                    continue
                 if tariff is not None:
                     break
+            if tariff is None and failed:
+                # Every stream that might know either failed or had nothing:
+                # keep the last rates known rather than blank them.
+                tariff = self._tariffs.get(consumption.resource_id)
             self._tariffs[consumption.resource_id] = tariff
 
     def _schedule_backfill(self) -> None:
@@ -357,9 +357,15 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
         task = self._backfill_task
         if task is None or task.done():
             return
-        with contextlib.suppress(TimeoutError, asyncio.CancelledError):
-            async with asyncio.timeout(BACKFILL_SHUTDOWN_TIMEOUT):
-                await task
+        # asyncio.wait, not asyncio.timeout: a timeout cancels what it awaits,
+        # which is exactly what this exists to avoid. When the wait gives up,
+        # the import is still running and is left to finish on its own.
+        _, pending = await asyncio.wait({task}, timeout=BACKFILL_SHUTDOWN_TIMEOUT)
+        if pending:
+            _LOGGER.warning(
+                "Statistics import still running after %s s; leaving it to finish",
+                BACKFILL_SHUTDOWN_TIMEOUT,
+            )
 
     async def _async_catchup_if_due(self) -> None:
         """Prompt Glowmarkt to pull fresh DCC readings, at most every 2 hours.
@@ -383,21 +389,28 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
     async def _async_sum_before(
         self, statistic_id: str, moment: datetime
     ) -> float | None:
-        """Return the cumulative sum immediately before `moment`, if known."""
-        rows = await get_instance(self.hass).async_add_executor_job(
-            statistics_during_period,
-            self.hass,
-            moment - timedelta(days=ANCHOR_LOOKBACK_DAYS),
-            moment,
-            {statistic_id},
-            "hour",
-            None,
-            {"sum"},
-        )
-        series = rows.get(statistic_id) or []
-        if not series:
-            return None
-        return float(series[-1].get("sum") or 0.0)
+        """Return the cumulative sum of the last stored hour before `moment`.
+
+        Searched in widening steps, out to the deepest history the options
+        allow, because a long gap before the window is legitimate: a total
+        restarted at zero beside older rows that are kept is a step down of
+        everything imported so far. None means there is no earlier row at all.
+        """
+        for days in ANCHOR_LOOKBACK_STEPS_DAYS:
+            rows = await get_instance(self.hass).async_add_executor_job(
+                statistics_during_period,
+                self.hass,
+                moment - timedelta(days=days),
+                moment,
+                {statistic_id},
+                "hour",
+                None,
+                {"sum"},
+            )
+            series = rows.get(statistic_id) or []
+            if series:
+                return float(series[-1].get("sum") or 0.0)
+        return None
 
     async def _async_hours_with_statistics(
         self, statistic_id: str, start: datetime, end: datetime
@@ -418,54 +431,13 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
             for row in rows.get(statistic_id) or []
         ]
 
-    async def _async_flatten_unbacked_rows(
-        self,
-        statistic_id: str,
-        metadata: StatisticMetaData,
-        start: datetime,
-        end: datetime,
-        written: list[StatisticData],
-        anchor_sum: float,
-    ) -> int:
-        """Rewrite stored rows in [start, end) that this pass had no reading for.
-
-        Every hour this pass wrote carries a freshly computed running total. A
-        row it did not write, because the hour is now a gap or lies past the
-        data, still carries whatever total it was stored with, and the series
-        would step backwards there, reading as a large negative hour. Each such
-        row is rewritten as zero with the total carried forward from the last
-        hour before it, so no consumption is invented; the real figure replaces
-        it when the reading lands.
-        """
-        rewritten = {row["start"] for row in written}
-        stale = [
-            moment
-            for moment in await self._async_hours_with_statistics(
-                statistic_id, start, end
-            )
-            if moment not in rewritten
-        ]
-        if not stale:
-            return 0
-
-        totals = [(row["start"], row["sum"] or 0.0) for row in written]
-        rows: list[StatisticData] = []
-        index = 0
-        carried = anchor_sum
-        for moment in sorted(stale):
-            while index < len(totals) and totals[index][0] < moment:
-                carried = totals[index][1]
-                index += 1
-            rows.append(StatisticData(start=moment, state=0.0, sum=carried))
-
-        async_add_external_statistics(self.hass, metadata, rows)
-        _LOGGER.debug(
-            "Flattened %d hour(s) without a reading for %s", len(rows), statistic_id
-        )
-        return len(rows)
-
     async def _async_backfill_guarded(self) -> None:
-        """Run the backfill, swallowing errors so the task never explodes."""
+        """Run the import; publish the sensors only if it succeeded.
+
+        A failed or cancelled import must not call async_set_updated_data:
+        that marks the coordinator successful, so a rejected password would
+        bring the entities back as available, showing stale figures.
+        """
         try:
             await self.async_backfill()
         except GlowmarktAuthError:
@@ -476,7 +448,7 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
             _LOGGER.warning("Glowmarkt statistics import stopped: %s", err)
         except Exception:
             _LOGGER.exception("Glowmarkt statistics backfill failed")
-        finally:
+        else:
             if not self.hass.is_stopping:
                 self.async_set_updated_data(self._snapshot())
 
@@ -495,23 +467,59 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
 
             await self._store.async_save(self._depth_applied)
 
+    @staticmethod
+    def _merge_readings(
+        into: dict[datetime, float | None],
+        readings: list[tuple[int, float | None]],
+        start: datetime,
+        end: datetime,
+    ) -> None:
+        """Add one response's hours to `into`: aligned, in range, once each.
+
+        Responses can repeat an hour or arrive in any order. Summing them as
+        they come would count a repeated hour twice and build the running total
+        out of time order. A repeated hour with a different value is not
+        guessed at: the pass fails and the next one tries again.
+        """
+        for timestamp, value in readings:
+            moment = dt_util.utc_from_timestamp(timestamp)
+            if moment < start or moment >= end:
+                continue
+            if moment.minute or moment.second:
+                raise GlowmarktConnectionError(
+                    f"Reading at {moment.isoformat()} is not on the hour"
+                )
+            if moment in into and into[moment] != value:
+                raise GlowmarktConnectionError(
+                    f"Two different readings for {moment.isoformat()}"
+                )
+            into[moment] = value
+
     async def _async_backfill_resource(self, resource: GlowmarktResource) -> None:
         """Import the hourly statistics this resource has data for.
 
         The edge of the data is `last-time`, the newest half-hour Glowmarkt has
         collected: an hour is imported only once both its half-hours are in.
-        Before that edge a null reading is a gap, which is left out rather than
-        stored as zero, and a zero is a real zero.
+        Before that edge a null reading is a gap, which gets no row, and a zero
+        is a real zero.
 
         A trailing window is re-imported on every pass, because readings arrive
         late and get revised. Statistics are keyed by hour, so re-importing
         replaces them in place; the running sum is re-anchored to the last
         statistic before the window so the cumulative series stays consistent.
+        A stored hour the pass has no reading for (it became a gap, or lies past
+        the data) is rewritten as zero use carrying the total forward, so the
+        series never steps back.
+
+        Nothing is written until every read has succeeded: all chunks, the
+        anchor and the stored hours. The rewrite then goes to the recorder as
+        one batch, so a failure part-way leaves the stored series as it was.
 
         If the configured history depth has been increased since the last run,
         the series is instead cleared and rebuilt from the deeper start: rows
         cannot simply be prepended, because `sum` is cumulative and every later
-        row would need recomputing.
+        row would need recomputing. The clear is queued only after the reads,
+        on the recorder's FIFO queue ahead of the import.
         """
         assert self._depth_applied is not None
         statistic_id = resource.statistic_id
@@ -543,17 +551,6 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
         history_start = current_hour - timedelta(days=requested_days)
 
         if rebuild:
-            if applied_days:
-                _LOGGER.info(
-                    "History depth for %s increased from %d to %d days, "
-                    "rebuilding the series",
-                    statistic_id,
-                    applied_days,
-                    requested_days,
-                )
-                # Queued on the recorder's FIFO queue, so it is guaranteed to
-                # run before the imports below.
-                get_instance(self.hass).async_clear_statistics([statistic_id])
             anchor_sum = 0.0
             cursor = history_start
         else:
@@ -576,8 +573,8 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
                 )
                 found = await self._async_sum_before(statistic_id, cursor)
                 if found is None:
-                    # No stored row before the window to anchor the running
-                    # total to: rebuild from the start of the configured history.
+                    # No stored row anywhere before the window: the series
+                    # starts inside it, so build it from the configured start.
                     cursor = history_start
                     anchor_sum = 0.0
                 else:
@@ -585,6 +582,69 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
             else:
                 anchor_sum = 0.0
                 cursor = history_start
+
+        # The sensors' week is read whatever the import depth, so a shallow
+        # history still has a whole yesterday to report.
+        recent_from = current_hour - timedelta(hours=REFRESH_WINDOW_HOURS)
+        fetch_from = min(cursor, recent_from)
+
+        hourly: dict[datetime, float | None] = {}
+        chunk_start = fetch_from
+        while chunk_start < data_until:
+            if self.hass.is_stopping:
+                _LOGGER.debug("Home Assistant is stopping, abandoning backfill")
+                return
+            chunk_end = min(chunk_start + timedelta(days=HOURLY_CHUNK_DAYS), data_until)
+            readings = await self.client.async_get_readings(
+                resource.resource_id,
+                chunk_start.replace(tzinfo=None),
+                (chunk_end - timedelta(seconds=1)).replace(tzinfo=None),
+                PERIOD_HOURLY,
+                offset_minutes=0,
+            )
+            self._merge_readings(hourly, readings, chunk_start, chunk_end)
+            chunk_start = chunk_end
+            if chunk_start < data_until:
+                await asyncio.sleep(CHUNK_DELAY_SECONDS)
+
+        def scaled(value: float | None) -> float | None:
+            if value is None or not resource.info.is_cost:
+                return value
+            return value / PENCE_PER_POUND
+
+        self._recent[resource.resource_id] = {
+            moment: scaled(value)
+            for moment, value in hourly.items()
+            if moment >= recent_from
+        }
+
+        # Every read is done; work out the whole rewrite before touching it.
+        stored = (
+            set()
+            if rebuild
+            else set(
+                await self._async_hours_with_statistics(
+                    statistic_id, cursor, current_hour
+                )
+            )
+        )
+        if self.hass.is_stopping:
+            return
+
+        rows: list[StatisticData] = []
+        running_sum = anchor_sum
+        imported = 0
+        moment = cursor
+        while moment < current_hour:
+            value = scaled(hourly.get(moment)) if moment < data_until else None
+            if value is not None:
+                running_sum += value
+                rows.append(StatisticData(start=moment, state=value, sum=running_sum))
+                imported += 1
+            elif moment in stored:
+                # Stored before, no reading now: flat, total carried forward.
+                rows.append(StatisticData(start=moment, state=0.0, sum=running_sum))
+            moment += timedelta(hours=1)
 
         metadata = StatisticMetaData(
             mean_type=StatisticMeanType.NONE,
@@ -600,67 +660,24 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
             ),
         )
 
-        window_start = cursor
-        running_sum = anchor_sum
-        written: list[StatisticData] = []
-        recent: dict[datetime, float | None] = {}
-        recent_from = current_hour - timedelta(hours=REFRESH_WINDOW_HOURS)
-        while cursor < data_until:
-            if self.hass.is_stopping:
-                _LOGGER.debug("Home Assistant is stopping, abandoning backfill")
-                return
-
-            chunk_end = min(cursor + timedelta(days=HOURLY_CHUNK_DAYS), data_until)
-            readings = await self.client.async_get_readings(
-                resource.resource_id,
-                cursor.replace(tzinfo=None),
-                (chunk_end - timedelta(seconds=1)).replace(tzinfo=None),
-                PERIOD_HOURLY,
-                offset_minutes=0,
+        if rebuild and applied_days:
+            _LOGGER.info(
+                "History depth for %s increased from %d to %d days, "
+                "rebuilding the series",
+                statistic_id,
+                applied_days,
+                requested_days,
             )
-
-            batch: list[StatisticData] = []
-            for timestamp, raw in readings:
-                moment = dt_util.utc_from_timestamp(timestamp)
-                if moment < cursor or moment >= chunk_end:
-                    continue
-                value = (
-                    None
-                    if raw is None
-                    else raw / PENCE_PER_POUND if resource.info.is_cost else raw
-                )
-                if moment >= recent_from:
-                    recent[moment] = value
-                if value is None:
-                    # A gap: no row, so it cannot pose as zero use.
-                    continue
-                running_sum += value
-                batch.append(StatisticData(start=moment, state=value, sum=running_sum))
-
-            # Import per chunk rather than accumulating the lot: a deep backfill
-            # is tens of thousands of rows, and this way a failure part-way
-            # leaves the depth marker unset so the next run simply starts over.
-            if batch:
-                async_add_external_statistics(self.hass, metadata, batch)
-                written.extend(batch)
-
-            cursor = chunk_end
-            if cursor < data_until:
-                await asyncio.sleep(CHUNK_DELAY_SECONDS)
-
-        self._recent[resource.resource_id] = recent
-
-        # Rows this pass did not write would drag the cumulative total
-        # backwards: gaps that were stored before, and anything past the data.
-        await self._async_flatten_unbacked_rows(
-            statistic_id, metadata, window_start, current_hour, written, anchor_sum
-        )
+            # Queued on the recorder's FIFO queue, so it runs before the import.
+            get_instance(self.hass).async_clear_statistics([statistic_id])
+        if rows:
+            async_add_external_statistics(self.hass, metadata, rows)
 
         # Recorded even when nothing came back, so a window reaching further
         # back than the meter's own history does not rebuild on every poll.
         self._depth_applied[statistic_id] = max(applied_days, requested_days)
 
-        if written:
+        if imported:
             _LOGGER.debug(
-                "Imported %d hourly statistics for %s", len(written), statistic_id
+                "Imported %d hourly statistics for %s", imported, statistic_id
             )

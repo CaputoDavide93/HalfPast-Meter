@@ -5,6 +5,37 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+Fixes from an independent code review; each has a regression test.
+
+### Fixed
+
+- A long gap before the re-import window no longer restarts the running total
+  at zero beside older rows (a large negative step): the anchor is searched out
+  to the deepest history the options allow.
+- Nothing is written until every chunk, the anchor and the stored hours have
+  been read; the rewrite then goes to the recorder as one batch, and a depth
+  increase clears the series only after the reads succeed. A failure part-way
+  leaves the stored series as it was.
+- A repeated hour is counted once, and readings are summed in time order
+  whatever order the API answers in. Two different readings for one hour fail
+  the pass instead of being guessed at.
+- An error answered with HTTP 200, a missing data list, a malformed row or a
+  non-finite value is an error, not "no readings", so it can no longer flatten
+  stored hours.
+- Statistic ids are assigned once per stream and stored: a second site or a
+  second account no longer renames or overwrites an existing history, and ids
+  no longer carry the site name (which reached diagnostics).
+- Waiting for the import on unload no longer cancels it.
+- A failed import no longer marks the integration as updated successfully.
+- The tariff fallback tries the cost stream when the consumption stream errors.
+- A rejected password during meter discovery starts reauthentication.
+- The last-full-day sensors work with a one-day history depth: the sensors'
+  week is read whatever the depth.
+
+### Added
+
+- Brand icons (light and dark) and a README banner.
+
 ## [0.2.0] - 2026-10-06
 
 First version of `bright_meter`, started from

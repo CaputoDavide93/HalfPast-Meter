@@ -146,7 +146,8 @@ async def test_second_pass_does_not_duplicate(
     await entry.runtime_data.async_backfill()
     await _settle(hass, entry)
 
-    assert len(await _rows(hass)) == len(first)
+    # Same hours, same states, same running totals: not merely the same count.
+    assert await _rows(hass) == first
 
 
 async def test_uncollected_zero_tail_is_not_imported(

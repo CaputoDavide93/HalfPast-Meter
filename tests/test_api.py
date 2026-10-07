@@ -7,7 +7,10 @@ from datetime import UTC, datetime
 import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
+from pytest_homeassistant_custom_component.test_util.aiohttp import (
+    AiohttpClientMocker,
+    AiohttpClientMockResponse,
+)
 
 from custom_components.bright_meter.api import (
     GlowmarktAuthError,
@@ -106,20 +109,14 @@ async def test_readings_ask_for_nulls_and_keep_them_as_gaps(
     Without `nulls=1` the API answers 0 for an hour it has no data for, which
     reads exactly like a house that used nothing. With it, the gap comes back as
     null, and the client hands it on as None so the importer can tell the two
-    apart. Malformed rows are still dropped.
+    apart.
     """
     aioclient_mock.post(f"{BASE_URL}/auth", json=AUTH_OK)
     aioclient_mock.get(
         f"{BASE_URL}/resource/r1/readings",
         json={
             "status": "OK",
-            "data": [
-                [1523318400, 48.79],
-                [1523322000, None],
-                [1523325600, 0],
-                ["bad", "row"],
-                [1523329200],
-            ],
+            "data": [[1523318400, 48.79], [1523322000, None], [1523325600, 0]],
         },
     )
 
@@ -131,6 +128,36 @@ async def test_readings_ask_for_nulls_and_keep_them_as_gaps(
     query = aioclient_mock.mock_calls[-1][1].query
     assert query["nulls"] == "1"
     assert query["offset"] == "0"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        # An error answered with HTTP 200.
+        {"status": "ERROR", "error": "temporarily unavailable"},
+        {"error": "temporarily unavailable"},
+        # No data list at all.
+        {"status": "OK"},
+        {"status": "OK", "data": {"rows": []}},
+        # A malformed row, a non-numeric value, a non-finite one.
+        {"status": "OK", "data": [["bad", "row"]]},
+        {"status": "OK", "data": [[1523318400]]},
+        {"status": "OK", "data": [[1523318400, "lots"]]},
+        {"status": "OK", "data": [[1523318400, "NaN"]]},
+        {"status": "OK", "data": [[1523318400, "Infinity"]]},
+    ],
+)
+async def test_a_malformed_readings_response_is_an_error_not_a_gap(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, payload: dict
+) -> None:
+    """Read as "no readings", an error would flatten hours already stored."""
+    aioclient_mock.post(f"{BASE_URL}/auth", json=AUTH_OK)
+    aioclient_mock.get(f"{BASE_URL}/resource/r1/readings", json=payload)
+
+    with pytest.raises(GlowmarktConnectionError):
+        await _client(hass).async_get_readings(
+            "r1", datetime(2018, 4, 10), datetime(2018, 4, 11), "PT1H"
+        )
 
 
 async def test_expired_token_triggers_one_retry(
@@ -254,3 +281,30 @@ async def test_tariff_with_only_one_figure_keeps_it(
     assert await _client(hass).async_get_tariff("r1") == Tariff(
         unit_rate_p=24.46, standing_charge_p=None
     )
+
+
+async def test_a_dead_token_is_renewed_and_the_request_succeeds(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """One 401 mid-session: log in again, retry once, and get the answer."""
+    aioclient_mock.post(f"{BASE_URL}/auth", json=AUTH_OK)
+    answers = iter(
+        [
+            AiohttpClientMockResponse("GET", f"{BASE_URL}/virtualentity", status=401),
+            AiohttpClientMockResponse(
+                "GET",
+                f"{BASE_URL}/virtualentity",
+                json=[{"name": "Home", "veId": "ve-1"}],
+            ),
+        ]
+    )
+    async def next_answer(*args, **kwargs) -> AiohttpClientMockResponse:
+        return next(answers)
+
+    aioclient_mock.get(f"{BASE_URL}/virtualentity", side_effect=next_answer)
+
+    result = await _client(hass).async_get_virtual_entities()
+
+    assert [ve["veId"] for ve in result] == ["ve-1"]
+    auth_calls = [c for c in aioclient_mock.mock_calls if c[1].path.endswith("/auth")]
+    assert len(auth_calls) == 2

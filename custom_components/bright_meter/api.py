@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -102,6 +103,46 @@ def _parse_tariff(payload: Any) -> Tariff | None:
     if rate is None and standing is None:
         return None
     return Tariff(unit_rate_p=rate, standing_charge_p=standing)
+
+
+def _parse_readings(result: Any, resource_id: str) -> list[tuple[int, float | None]]:
+    """Validate a readings response, or raise rather than guess.
+
+    A response that is not a well-formed list of [timestamp, value] rows is an
+    error, not an empty result. Read as "no readings", an error answered with
+    HTTP 200 would let the importer flatten hours it already holds, which
+    erases consumption. A value that is not a finite number is an error for the
+    same reason: one NaN poisons every running total after it.
+    """
+    if not isinstance(result, dict):
+        raise GlowmarktConnectionError(
+            f"Unexpected readings response for resource {resource_id}"
+        )
+    if result.get("error") or result.get("status", "OK") != "OK":
+        raise GlowmarktConnectionError(
+            f"Readings for {resource_id} answered status "
+            f"{result.get('status')!r}: {result.get('error')!r}"
+        )
+    rows = result.get("data")
+    if not isinstance(rows, list):
+        raise GlowmarktConnectionError(f"Readings for {resource_id} carry no data list")
+
+    readings: list[tuple[int, float | None]] = []
+    for row in rows:
+        if not isinstance(row, (list, tuple)) or len(row) < 2:
+            raise GlowmarktConnectionError(f"Malformed reading row {row!r}")
+        timestamp, value = row[0], row[1]
+        try:
+            if isinstance(timestamp, bool) or isinstance(value, bool):
+                raise TypeError
+            stamp = int(timestamp)
+            number = None if value is None else float(value)
+        except (TypeError, ValueError) as err:
+            raise GlowmarktConnectionError(f"Malformed reading row {row!r}") from err
+        if number is not None and not math.isfinite(number):
+            raise GlowmarktConnectionError(f"Non-finite reading {row!r}")
+        readings.append((stamp, number))
+    return readings
 
 
 class GlowmarktClient:
@@ -279,25 +320,7 @@ class GlowmarktClient:
         }
         result = await self._async_get(f"/resource/{resource_id}/readings", params)
 
-        if not isinstance(result, dict):
-            raise GlowmarktConnectionError(
-                f"Unexpected readings response for resource {resource_id}"
-            )
-
-        readings: list[tuple[int, float | None]] = []
-        for row in result.get("data") or []:
-            # Rows are [timestamp, value]; value is null for periods with no data.
-            if not isinstance(row, (list, tuple)) or len(row) < 2:
-                continue
-            timestamp, value = row[0], row[1]
-            if timestamp is None or isinstance(timestamp, bool):
-                continue
-            try:
-                stamp = int(timestamp)
-                readings.append((stamp, None if value is None else float(value)))
-            except (TypeError, ValueError):
-                continue
-        return readings
+        return _parse_readings(result, resource_id)
 
     async def async_get_last_time(self, resource_id: str) -> datetime | None:
         """Return the start of the newest reading Glowmarkt holds, in UTC.
