@@ -49,14 +49,16 @@ Every 30 minutes the integration asks Glowmarkt how far each stream's data reach
 ## 🚀 Quick Start
 
 1. **Set up the Bright app** (iOS or Android, free): add your smart meter and let it share the meter's data. Wait until the app shows your usage.
-2. **Install.** The repository is private, so HACS cannot install it yet. From a clone:
+2. **Install.**
+   - **HACS** (once this repository is public; HACS installs only public repositories): **HACS → ⋮ → Custom repositories**, add `https://github.com/CaputoDavide93/Bright-Home-Assistant` as an **Integration**, install **Bright Smart Meter**, restart Home Assistant.
+   - **While it is private**, from a clone:
 
-   ```bash
-   cp .env.example .env        # set HA_SSH_TARGET to your HA host's SSH login
-   scripts/install-on-ha.sh --restart
-   ```
+     ```bash
+     cp .env.example .env        # set HA_SSH_TARGET to your HA host's SSH login
+     scripts/install-on-ha.sh --restart
+     ```
 
-   Or copy `custom_components/bright_meter/` into Home Assistant's `config/custom_components/` and restart.
+     Or copy `custom_components/bright_meter/` into Home Assistant's `config/custom_components/` and restart.
 3. **Add it:** **Settings → Devices & services → Add integration → Bright Smart Meter**. The guided setup takes four pages: sign in, your meters and how far their data reaches, how much history, and the exact statistics for the Energy dashboard.
 4. **Energy dashboard:** pick the statistics page 4 lists. If another integration already feeds the same meters, remove it from the dashboard first, or the energy is counted twice.
 
@@ -176,7 +178,7 @@ Bright-Home-Assistant/
 │   └── gen_docs.py          # 🤖 the statistics and sensor tables (README, docs/entities.md)
 ├── docs/                    # 📚 setup, energy dashboard, entities, how it works, API, development
 │   └── assets/              # 🖼️ banner and diagrams, light and dark
-├── .github/                 # 🤖 tests + hassfest workflows, dependabot
+├── .github/                 # 🤖 tests, Hassfest and HACS workflows, dependabot
 ├── Makefile                 # 🔧 venv, check, test, lint, diagram, install
 ├── .env.example             # ⚙️ the install script's SSH target
 ├── hacs.json  pyproject.toml  pytest.ini  requirements_test.txt
