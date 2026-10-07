@@ -41,6 +41,15 @@ class GlowmarktConnectionError(GlowmarktError):
     """The API could not be reached, or returned something unusable."""
 
 
+class GlowmarktAccessDeniedError(GlowmarktConnectionError):
+    """Bright refused one call although the account had just signed in.
+
+    Not a credentials problem: a wrong password fails at sign-in itself. Seen
+    for a stream Bright is not sharing yet (a meter still being set up or
+    fixed), so it is handled per stream, never as "re-enter your password".
+    """
+
+
 @dataclass(frozen=True, kw_only=True)
 class Tariff:
     """The rates the meter itself holds, as reported over the DCC, in pence.
@@ -153,7 +162,7 @@ class GlowmarktClient:
     ) -> None:
         """Initialise the client."""
         self._session = session
-        self._username = username
+        self._username = username.strip()
         self._password = password
         self._token: str | None = None
         self._token_expires: float = 0.0
@@ -232,12 +241,16 @@ class GlowmarktClient:
                 ) as response:
                     if response.status in (401, 403):
                         # Force a fresh login and try once more before giving up.
+                        # A wrong password fails in that login, as an auth error.
+                        # Refused again with a fresh session is access denied for
+                        # this call alone, not bad credentials.
                         self._token = None
                         self._token_expires = 0.0
                         if attempt == 1:
                             continue
-                        raise GlowmarktAuthError(
-                            "Glowmarkt rejected the session token"
+                        raise GlowmarktAccessDeniedError(
+                            f"Bright refused GET {path} (HTTP {response.status}) "
+                            "with a fresh session"
                         )
                     if response.status >= 400:
                         raise GlowmarktConnectionError(

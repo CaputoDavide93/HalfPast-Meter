@@ -172,6 +172,7 @@ HalfPast-Meter/
 │   └── bright_meter/        # 🧩 the integration: API client, coordinator, sensors, flows, brand icons
 ├── tests/                   # 🧪 pytest against Home Assistant 2026.9.4
 ├── scripts/
+│   ├── check-login.py       # 🔑 test a Bright login as the integration signs in
 │   └── install-on-ha.sh     # 📦 ship the committed component to an HA host over SSH
 ├── tools/
 │   ├── gen_diagram.py       # 🗺️ draws the diagrams in docs/assets/

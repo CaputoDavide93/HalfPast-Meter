@@ -5,6 +5,24 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-10-07
+
+### Fixed
+
+- **A stream Bright refuses no longer reads as a wrong password.** Seen on a
+  live account: the login was accepted, but one stream (a gas meter Bright was
+  fixing) answered 403, and setup said "Bright rejected those details". A
+  refusal that persists after a fresh, successful sign-in is now access denied
+  for that call: setup lists the stream as refused and carries on, and the
+  integration imports the other streams and picks the refused one up once Bright
+  shares it. A wrong password still fails at sign-in, as before.
+- Spaces around the email, from autofill or pasting, are ignored at sign-in.
+
+### Added
+
+- `scripts/check-login.py`: checks a Bright login the way the integration signs
+  in, without echoing the password, and says what Bright answered.
+
 ## [0.3.2] - 2026-10-07
 
 ### Changed

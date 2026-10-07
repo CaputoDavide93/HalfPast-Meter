@@ -218,3 +218,26 @@ async def test_an_account_without_supported_meters_is_refused(
 
     assert result["step_id"] == "user"
     assert result["errors"] == {"base": "no_meters"}
+
+
+async def test_spaces_around_the_email_are_ignored(
+    bright_env, hass: HomeAssistant
+) -> None:
+    """Autofill and pasting add spaces; an email never contains one."""
+    seen: list[str] = []
+
+    def make_client(session, username, password):
+        seen.append(username)
+        return FakeGlowmarktClient()
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    with patch(FLOW_CLIENT, side_effect=make_client):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_USERNAME: f"  {USERNAME} ", CONF_PASSWORD: PASSWORD},
+        )
+
+    assert result["step_id"] == "meters"
+    assert seen == [USERNAME]
