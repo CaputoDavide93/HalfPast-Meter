@@ -31,7 +31,7 @@ days).
 **With HACS**, once the repository is public (HACS installs only public
 repositories): **HACS → ⋮ → Custom repositories**, add
 `https://github.com/CaputoDavide93/Bright-Home-Assistant` with the category
-**Integration**, install **Bright Smart Meter**, then restart Home Assistant.
+**Integration**, install **HalfPast Meter**, then restart Home Assistant.
 HACS offers each GitHub release, and notifies you of new ones.
 
 **While the repository is private**, install it one of these two ways.
@@ -53,7 +53,7 @@ a time that suits the house.
 
 ## 3. Add it: the guided setup
 
-**Settings → Devices & services → Add integration → Bright Smart Meter.**
+**Settings → Devices & services → Add integration → HalfPast Meter.**
 
 | Page | What you do | What it shows |
 |---|---|---|
@@ -74,7 +74,7 @@ choose the `bright_meter:` statistics.
 
 ## 5. Check it worked
 
-- **Settings → Devices & services → Bright Smart Meter** shows one device per
+- **Settings → Devices & services → HalfPast Meter** shows one device per
   site.
 - The **data until** sensors show a time within the last day or so.
 - **Developer tools → Statistics** lists the `bright_meter:` statistics.

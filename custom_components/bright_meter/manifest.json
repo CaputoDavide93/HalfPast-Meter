@@ -1,6 +1,6 @@
 {
   "domain": "bright_meter",
-  "name": "Bright Smart Meter",
+  "name": "HalfPast Meter",
   "after_dependencies": [
     "energy"
   ],
@@ -16,5 +16,5 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/CaputoDavide93/Bright-Home-Assistant/issues",
   "requirements": [],
-  "version": "0.3.0"
+  "version": "0.3.1"
 }

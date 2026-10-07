@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="docs/assets/banner.png" alt="A house outline holding a small bar chart, beside half-hourly bars of electricity in amber and gas in blue." width="100%">
+<img src="docs/assets/banner.png" alt="The HalfPast Meter mark, three rising bars on a tile, beside half-hourly bars of electricity in amber and gas in blue." width="100%">
 
-# 💡 Bright Smart Meter for Home Assistant
+# 📊 HalfPast Meter
 
-**Half-hourly UK smart-meter data from the Bright app's DCC feed, filed in Home Assistant at the hour it happened, whoever your supplier is**
+**Your smart meter's half-hours, put back in Home Assistant where they happened, whoever supplies you**
 
 ![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![Home Assistant](https://img.shields.io/badge/Home_Assistant-2026.9-41BDF5?logo=homeassistant&logoColor=white)
@@ -50,7 +50,7 @@ Every 30 minutes the integration asks Glowmarkt how far each stream's data reach
 
 1. **Set up the Bright app** (iOS or Android, free): add your smart meter and let it share the meter's data. Wait until the app shows your usage.
 2. **Install.**
-   - **HACS** (once this repository is public; HACS installs only public repositories): **HACS → ⋮ → Custom repositories**, add `https://github.com/CaputoDavide93/Bright-Home-Assistant` as an **Integration**, install **Bright Smart Meter**, restart Home Assistant.
+   - **HACS** (once this repository is public; HACS installs only public repositories): **HACS → ⋮ → Custom repositories**, add `https://github.com/CaputoDavide93/Bright-Home-Assistant` as an **Integration**, install **HalfPast Meter**, restart Home Assistant.
    - **While it is private**, from a clone:
 
      ```bash
@@ -59,7 +59,7 @@ Every 30 minutes the integration asks Glowmarkt how far each stream's data reach
      ```
 
      Or copy `custom_components/bright_meter/` into Home Assistant's `config/custom_components/` and restart.
-3. **Add it:** **Settings → Devices & services → Add integration → Bright Smart Meter**. The guided setup takes four pages: sign in, your meters and how far their data reaches, how much history, and the exact statistics for the Energy dashboard.
+3. **Add it:** **Settings → Devices & services → Add integration → HalfPast Meter**. The guided setup takes four pages: sign in, your meters and how far their data reaches, how much history, and the exact statistics for the Energy dashboard.
 4. **Energy dashboard:** pick the statistics page 4 lists. If another integration already feeds the same meters, remove it from the dashboard first, or the energy is counted twice.
 
 Step by step, with what to check afterwards: [docs/setup.md](docs/setup.md).

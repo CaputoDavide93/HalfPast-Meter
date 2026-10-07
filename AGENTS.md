@@ -33,9 +33,10 @@ This repository follows Davide Caputo's house standards. The full spec is
 
 <!-- ── repo-specific notes below this line ─────────────────────────────── -->
 
-## This repo: the Bright smart meter integration
+## This repo: HalfPast Meter
 
-A Home Assistant custom integration, domain `bright_meter`, that imports UK
+A Home Assistant custom integration, displayed as **HalfPast Meter**, domain
+`bright_meter` (the domain predates the name and must not change), that imports UK
 smart-meter data from Hildebrand's Glowmarkt API (the DCC feed behind the free
 Bright app) as hourly external statistics. It started from
 [existentia/hildebrand-glow-ha](https://github.com/existentia/hildebrand-glow-ha)
