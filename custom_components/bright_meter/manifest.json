@@ -11,10 +11,10 @@
   "dependencies": [
     "recorder"
   ],
-  "documentation": "https://github.com/CaputoDavide93/Bright-Home-Assistant",
+  "documentation": "https://github.com/CaputoDavide93/HalfPast-Meter",
   "integration_type": "service",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/CaputoDavide93/Bright-Home-Assistant/issues",
+  "issue_tracker": "https://github.com/CaputoDavide93/HalfPast-Meter/issues",
   "requirements": [],
-  "version": "0.3.1"
+  "version": "0.3.2"
 }

@@ -5,6 +5,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-10-07
+
+### Changed
+
+- The repository is renamed to `HalfPast-Meter` to match the integration;
+  the manifest's documentation and issue-tracker links, the README, the setup
+  guide and the security policy point at the new address. GitHub redirects the
+  old one.
+
 ## [0.3.1] - 2026-10-07
 
 ### Changed

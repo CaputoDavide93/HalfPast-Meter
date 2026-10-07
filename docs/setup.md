@@ -30,7 +30,7 @@ days).
 
 **With HACS**, once the repository is public (HACS installs only public
 repositories): **HACS → ⋮ → Custom repositories**, add
-`https://github.com/CaputoDavide93/Bright-Home-Assistant` with the category
+`https://github.com/CaputoDavide93/HalfPast-Meter` with the category
 **Integration**, install **HalfPast Meter**, then restart Home Assistant.
 HACS offers each GitHub release, and notifies you of new ones.
 
