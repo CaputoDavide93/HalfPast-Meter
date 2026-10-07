@@ -7,6 +7,7 @@ How to change the integration without breaking anyone's history.
 ```bash
 make venv     # .venv with Home Assistant 2026.9.4 and the test plugin, via uv
 make check    # what CI runs: ruff, pytest, diagrams and generated tables current
+make hassfest # Home Assistant's own validation, the other CI job (needs Docker)
 ```
 
 `requirements_test.txt` pins `pytest-homeassistant-custom-component`, which pins
