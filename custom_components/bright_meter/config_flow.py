@@ -221,7 +221,10 @@ class GlowmarktConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            username = user_input[CONF_USERNAME]
+            # Autofill and pasting add spaces; an email never contains one. The
+            # password is left exactly as typed.
+            username = user_input[CONF_USERNAME].strip()
+            user_input = {**user_input, CONF_USERNAME: username}
             await self.async_set_unique_id(username.lower())
             self._abort_if_unique_id_configured()
             client = GlowmarktClient(

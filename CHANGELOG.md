@@ -5,6 +5,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Spaces around the email, from autofill or pasting, are ignored at sign-in.
+
+### Added
+
+- `scripts/check-login.py`: checks a Bright login the way the integration signs
+  in, without echoing the password, and says what Bright answered.
+
 ## [0.3.2] - 2026-10-07
 
 ### Changed

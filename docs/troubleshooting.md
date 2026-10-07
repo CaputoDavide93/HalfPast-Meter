@@ -6,7 +6,7 @@ Symptom first. Most "faults" are the feed being late, which is normal.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| *Bright rejected those details* | Wrong email or password | Sign in to the Bright app with them first; use exactly the same |
+| *Bright rejected those details* | Wrong email or password, or an account that signs in with Apple or Google and so has no Bright password | Run `python3 scripts/check-login.py`: it signs in exactly as the integration does, without showing the password, and says what Bright answered |
 | *Could not reach Bright* | No internet, or `api.glowmarkt.com` down | Try again later |
 | *This account has no electricity or gas meter yet* | The meter is not set up or not sharing data in Bright | Finish setup in the app, wait until it shows usage |
 | *Your meters* says **no readings yet** | Bright has not collected anything yet | Normal for a day or two; carry on, it fills in on its own |

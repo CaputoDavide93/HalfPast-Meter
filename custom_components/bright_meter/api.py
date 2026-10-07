@@ -153,7 +153,7 @@ class GlowmarktClient:
     ) -> None:
         """Initialise the client."""
         self._session = session
-        self._username = username
+        self._username = username.strip()
         self._password = password
         self._token: str | None = None
         self._token_expires: float = 0.0
