@@ -239,6 +239,9 @@ class GlowmarktClient:
                     headers=headers,
                     timeout=REQUEST_TIMEOUT,
                 ) as response:
+                    _LOGGER.debug(
+                        "GET %s -> HTTP %s (attempt %s)", path, response.status, attempt
+                    )
                     if response.status in (401, 403):
                         # Force a fresh login and try once more before giving up.
                         # A wrong password fails in that login, as an auth error.
