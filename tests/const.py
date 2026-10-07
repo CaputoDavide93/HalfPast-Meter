@@ -5,7 +5,11 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime, timedelta
 
-from custom_components.bright_meter.api import GlowmarktConnectionError, Tariff
+from custom_components.bright_meter.api import (
+    GlowmarktAccessDeniedError,
+    GlowmarktConnectionError,
+    Tariff,
+)
 
 USERNAME = "meter@example.com"
 PASSWORD = "hunter2"
@@ -141,6 +145,8 @@ class FakeGlowmarktClient:
         self.tariff_errors: set[str] = set()
         self.resources_error: Exception | None = None
         self.readings_gate: asyncio.Event | None = None
+        # Resource ids Bright refuses (401/403 even with a fresh session).
+        self.refused: set[str] = set()
         self.tariffs: dict[str, Tariff | None] = {
             RES_ELEC: TARIFF_ELEC,
             RES_GAS: TARIFF_GAS,
@@ -180,6 +186,8 @@ class FakeGlowmarktClient:
 
     async def async_get_last_time(self, resource_id: str) -> datetime | None:
         """The second half-hour of the last collected hour."""
+        if resource_id in self.refused:
+            raise GlowmarktAccessDeniedError(f"refused {resource_id}")
         return self._uncollected_from() - timedelta(minutes=30)
 
     async def async_get_tariff(self, resource_id: str) -> Tariff | None:
@@ -201,6 +209,8 @@ class FakeGlowmarktClient:
     ) -> list[tuple[int, float | None]]:
         """Return canned readings for the requested window."""
         self.readings_calls.append((resource_id, period))
+        if resource_id in self.refused:
+            raise GlowmarktAccessDeniedError(f"refused {resource_id}")
         if self.readings_gate is not None:
             await self.readings_gate.wait()
         if self.fail_readings_call == len(self.readings_calls):

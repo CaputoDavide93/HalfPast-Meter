@@ -29,6 +29,7 @@ from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import EnergyConverter
 
 from .api import (
+    GlowmarktAccessDeniedError,
     GlowmarktAuthError,
     GlowmarktClient,
     GlowmarktConnectionError,
@@ -170,6 +171,8 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
         self._data_until: dict[str, datetime | None] = {}
         self._tariffs: dict[str, Tariff | None] = {}
         self._tariffs_read: datetime | None = None
+        # Streams Bright has refused, so the warning is logged once each.
+        self._refused: set[str] = set()
 
     @property
     def _backfill_days(self) -> int:
@@ -261,9 +264,15 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
 
         try:
             for resource in self.resources:
-                self._last_times[resource.resource_id] = (
-                    await self.client.async_get_last_time(resource.resource_id)
-                )
+                try:
+                    self._last_times[resource.resource_id] = (
+                        await self.client.async_get_last_time(resource.resource_id)
+                    )
+                except GlowmarktAccessDeniedError as err:
+                    # One stream Bright will not share (a meter it is still
+                    # fixing, say) must not take the others down with it.
+                    self._last_times[resource.resource_id] = None
+                    self._note_refused(resource, err)
             await self._async_read_tariffs_if_due()
         except GlowmarktAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
@@ -275,6 +284,19 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
         self._schedule_backfill()
 
         return self._snapshot()
+
+    def _note_refused(
+        self, resource: GlowmarktResource, err: GlowmarktAccessDeniedError
+    ) -> None:
+        """Say once per stream that Bright is refusing it, then keep quiet."""
+        if resource.resource_id not in self._refused:
+            self._refused.add(resource.resource_id)
+            _LOGGER.warning(
+                "Bright refuses to share %s for now; the other streams carry on, "
+                "and it imports on its own once Bright shares it (%s)",
+                resource.statistic_id,
+                err,
+            )
 
     def _snapshot(self) -> BrightData:
         """The entity view of what the last import and tariff read found."""
@@ -468,7 +490,10 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
                 self._depth_applied = await self._store.async_load() or {}
 
             for resource in self.resources:
-                await self._async_backfill_resource(resource)
+                try:
+                    await self._async_backfill_resource(resource)
+                except GlowmarktAccessDeniedError as err:
+                    self._note_refused(resource, err)
 
             await self._store.async_save(self._depth_applied)
 

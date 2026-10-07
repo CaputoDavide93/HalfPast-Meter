@@ -41,7 +41,12 @@ from homeassistant.helpers.selector import (
 )
 from homeassistant.util import dt as dt_util
 
-from .api import GlowmarktAuthError, GlowmarktClient, GlowmarktConnectionError
+from .api import (
+    GlowmarktAccessDeniedError,
+    GlowmarktAuthError,
+    GlowmarktClient,
+    GlowmarktConnectionError,
+)
 from .const import (
     CONF_BACKFILL_DAYS,
     CONF_SITES,
@@ -80,6 +85,9 @@ class _Stream:
     classifier: str
     info: ClassifierInfo
     last_time: datetime | None
+    # Bright refused to say how far this stream reaches (seen for a meter it is
+    # still fixing). Kept: it fills in on its own once Bright shares it.
+    refused: bool = False
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -104,12 +112,18 @@ async def _async_discover(client: GlowmarktClient) -> list[_Site]:
             resource_id = resource.get("resourceId")
             if info is None or not resource_id or resource.get("active") is False:
                 continue
+            try:
+                last_time = await client.async_get_last_time(resource_id)
+                refused = False
+            except GlowmarktAccessDeniedError:
+                last_time, refused = None, True
             streams.append(
                 _Stream(
                     resource_id=resource_id,
                     classifier=classifier,
                     info=info,
-                    last_time=await client.async_get_last_time(resource_id),
+                    last_time=last_time,
+                    refused=refused,
                 )
             )
         if streams:
@@ -119,8 +133,13 @@ async def _async_discover(client: GlowmarktClient) -> list[_Site]:
     return sites
 
 
-def _reach(last_time: datetime | None) -> str:
+def _reach(last_time: datetime | None, *, refused: bool = False) -> str:
     """How far a stream's data reaches, in local time, for a person to read."""
+    if refused:
+        return (
+            "Bright refuses to share this stream's data yet (often a meter it is "
+            "still setting up); it imports on its own once Bright does"
+        )
     if last_time is None:
         return "no readings yet (normal for a day or two after setting up Bright)"
     until = dt_util.as_local(last_time + timedelta(minutes=30))
@@ -132,7 +151,7 @@ def _meters_text(sites: list[_Site]) -> str:
     for site in sites:
         lines.append(f"**{site.name}**")
         lines += [
-            f"- {stream.info.label}: {_reach(stream.last_time)}"
+            f"- {stream.info.label}: {_reach(stream.last_time, refused=stream.refused)}"
             for stream in site.streams
             if not stream.info.is_cost
         ]
@@ -236,6 +255,9 @@ class GlowmarktConfigFlow(ConfigFlow, domain=DOMAIN):
                 sites = await _async_discover(client)
             except GlowmarktAuthError:
                 errors["base"] = "invalid_auth"
+            except GlowmarktAccessDeniedError:
+                # Signed in, but Bright would not list the account's meters.
+                errors["base"] = "access_denied"
             except GlowmarktConnectionError:
                 errors["base"] = "cannot_connect"
             except Exception:

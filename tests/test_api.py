@@ -13,6 +13,7 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 )
 
 from custom_components.bright_meter.api import (
+    GlowmarktAccessDeniedError,
     GlowmarktAuthError,
     GlowmarktClient,
     GlowmarktConnectionError,
@@ -160,19 +161,42 @@ async def test_a_malformed_readings_response_is_an_error_not_a_gap(
         )
 
 
-async def test_expired_token_triggers_one_retry(
+async def test_refused_twice_with_a_fresh_session_is_access_denied(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
-    """A 401 mid-session re-authenticates and retries the request once."""
+    """A 401 mid-session signs in again and retries once; refused again with a
+    fresh session is access denied for that call, not bad credentials (a wrong
+    password fails at the sign-in itself)."""
     aioclient_mock.post(f"{BASE_URL}/auth", json=AUTH_OK)
+    aioclient_mock.get(f"{BASE_URL}/virtualentity", status=401)
+
+    with pytest.raises(GlowmarktAccessDeniedError):
+        await _client(hass).async_get_virtual_entities()
+
+    # Two sign-ins: the first one, then the forced one before the retry.
+    auth_calls = [c for c in aioclient_mock.mock_calls if c[1].path.endswith("/auth")]
+    assert len(auth_calls) == 2
+
+
+async def test_a_wrong_password_on_the_retry_is_an_auth_error(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """A password changed mid-session fails at the forced sign-in: auth error."""
+    answers = iter(
+        [
+            AiohttpClientMockResponse("POST", f"{BASE_URL}/auth", json=AUTH_OK),
+            AiohttpClientMockResponse("POST", f"{BASE_URL}/auth", status=401),
+        ]
+    )
+
+    async def next_auth(*args, **kwargs) -> AiohttpClientMockResponse:
+        return next(answers)
+
+    aioclient_mock.post(f"{BASE_URL}/auth", side_effect=next_auth)
     aioclient_mock.get(f"{BASE_URL}/virtualentity", status=401)
 
     with pytest.raises(GlowmarktAuthError):
         await _client(hass).async_get_virtual_entities()
-
-    # Two auth attempts: the initial login, then the forced retry.
-    auth_calls = [c for c in aioclient_mock.mock_calls if c[1].path.endswith("/auth")]
-    assert len(auth_calls) == 2
 
 
 async def test_last_time_is_the_newest_collected_reading(

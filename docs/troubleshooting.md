@@ -9,6 +9,7 @@ Symptom first. Most "faults" are the feed being late, which is normal.
 | *Bright rejected those details* | Wrong email or password, or an account that signs in with Apple or Google and so has no Bright password | Run `python3 scripts/check-login.py`: it signs in exactly as the integration does, without showing the password, and says what Bright answered |
 | *Could not reach Bright* | No internet, or `api.glowmarkt.com` down | Try again later |
 | *This account has no electricity or gas meter yet* | The meter is not set up or not sharing data in Bright | Finish setup in the app, wait until it shows usage |
+| *Your meters* says **Bright refuses to share this stream** | Bright answers "access denied" for that meter, often one it is still setting up or fixing | Carry on; the other meters import, and this one starts on its own once Bright shares it. If it lasts, ask Bright's support |
 | *Your meters* says **no readings yet** | Bright has not collected anything yet | Normal for a day or two; carry on, it fills in on its own |
 | *This Bright account is already set up* | The same email is already added | One entry per account |
 

@@ -53,7 +53,8 @@
       "invalid_auth": "Bright rejected those details. Use the same email and password as the Bright app.",
       "no_meters": "Signed in, but this account has no electricity or gas meter yet. Finish setting up your meter in the Bright app first.",
       "unknown": "Something unexpected went wrong. Check the Home Assistant log for details.",
-      "no_site_selected": "Choose at least one site."
+      "no_site_selected": "Choose at least one site.",
+      "access_denied": "Signed in, but Bright refused to list this account's meters. Check in the Bright app that the meter is set up and sharing its data."
     },
     "abort": {
       "already_configured": "This Bright account is already set up.",
