@@ -9,7 +9,7 @@
 ![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![Home Assistant](https://img.shields.io/badge/Home_Assistant-2026.9-41BDF5?logo=homeassistant&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
-[![Tests](https://github.com/CaputoDavide93/Bright-Home-Assistant/actions/workflows/tests.yaml/badge.svg)](https://github.com/CaputoDavide93/Bright-Home-Assistant/actions/workflows/tests.yaml)
+[![Tests](https://github.com/CaputoDavide93/HalfPast-Meter/actions/workflows/tests.yaml/badge.svg)](https://github.com/CaputoDavide93/HalfPast-Meter/actions/workflows/tests.yaml)
 
 </div>
 
@@ -50,7 +50,7 @@ Every 30 minutes the integration asks Glowmarkt how far each stream's data reach
 
 1. **Set up the Bright app** (iOS or Android, free): add your smart meter and let it share the meter's data. Wait until the app shows your usage.
 2. **Install.**
-   - **HACS** (once this repository is public; HACS installs only public repositories): **HACS → ⋮ → Custom repositories**, add `https://github.com/CaputoDavide93/Bright-Home-Assistant` as an **Integration**, install **HalfPast Meter**, restart Home Assistant.
+   - **HACS** (once this repository is public; HACS installs only public repositories): **HACS → ⋮ → Custom repositories**, add `https://github.com/CaputoDavide93/HalfPast-Meter` as an **Integration**, install **HalfPast Meter**, restart Home Assistant.
    - **While it is private**, from a clone:
 
      ```bash
@@ -167,7 +167,7 @@ The supplier has not sent a rate to the meter over the DCC, or has not yet after
 ## 📁 Repo structure
 
 ```text
-Bright-Home-Assistant/
+HalfPast-Meter/
 ├── custom_components/
 │   └── bright_meter/        # 🧩 the integration: API client, coordinator, sensors, flows, brand icons
 ├── tests/                   # 🧪 pytest against Home Assistant 2026.9.4
