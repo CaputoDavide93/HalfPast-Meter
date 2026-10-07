@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/banner.png" alt="A lightbulb holding a small bar chart, beside half-hourly bars of electricity in amber and gas in blue." width="100%">
+<img src="docs/assets/banner.png" alt="A house outline holding a small bar chart, beside half-hourly bars of electricity in amber and gas in blue." width="100%">
 
 # 💡 Bright Smart Meter for Home Assistant
 
@@ -29,6 +29,8 @@
 | 🔐 | Reauthentication | A password changed in the Bright app asks to be re-entered instead of failing silently |
 | 🩺 | Diagnostics | How far each stream reaches, its last full day and tariff, with no email, password, meter ids or site name |
 
+Works with **Bright**, Hildebrand Glow's free smart-meter app, through Hildebrand's Glowmarkt API. This is an independent project, not affiliated with or endorsed by Hildebrand or Glow.
+
 Nothing here is live. The DCC feed is half-hourly and 30 minutes to two days late, and Bright has no meter register for DCC-only accounts. Live power needs a Glow display or CAD on local MQTT, which this integration does not read.
 
 ---
@@ -46,23 +48,39 @@ Every 30 minutes the integration asks Glowmarkt how far each stream's data reach
 
 ## 🚀 Quick Start
 
-1. **Set up the Bright app** (iOS or Android, free): register, add your smart meter, and allow access to its data. Wait until the app shows your usage.
-2. **Install the integration.** The repository is private, so HACS cannot install it yet. From a clone:
+1. **Set up the Bright app** (iOS or Android, free): add your smart meter and let it share the meter's data. Wait until the app shows your usage.
+2. **Install.** The repository is private, so HACS cannot install it yet. From a clone:
 
    ```bash
    cp .env.example .env        # set HA_SSH_TARGET to your HA host's SSH login
    scripts/install-on-ha.sh --restart
    ```
 
-   Or copy `custom_components/bright_meter/` into your Home Assistant `config/custom_components/` and restart.
-3. **Add it:** **Settings → Devices & services → Add integration → Bright Smart Meter**, with the email and password you use in the Bright app.
-4. **Energy dashboard:** under **Settings → Dashboards → Energy**, choose the `bright_meter:` statistics below. If another integration already feeds the same meters, remove its sources first, or the energy is counted twice.
+   Or copy `custom_components/bright_meter/` into Home Assistant's `config/custom_components/` and restart.
+3. **Add it:** **Settings → Devices & services → Add integration → Bright Smart Meter**. The guided setup takes four pages: sign in, your meters and how far their data reaches, how much history, and the exact statistics for the Energy dashboard.
+4. **Energy dashboard:** pick the statistics page 4 lists. If another integration already feeds the same meters, remove it from the dashboard first, or the energy is counted twice.
+
+Step by step, with what to check afterwards: [docs/setup.md](docs/setup.md).
+
+---
+
+## 📚 Documentation
+
+| Guide | What it covers |
+|---|---|
+| [Setup](docs/setup.md) | The Bright app, installing, the four setup pages, checking it worked |
+| [Energy dashboard](docs/energy-dashboard.md) | Which statistic goes where, and moving over from another integration |
+| [Statistics and sensors](docs/entities.md) | Every statistic and sensor, generated from the code |
+| [How it works](docs/how-it-works.md) | One 30-minute pass, and the rules that keep the history right |
+| [Troubleshooting](docs/troubleshooting.md) | Symptoms first, then diagnostics and debug logging |
+| [Glowmarkt API](docs/glowmarkt-api.md) | The calls, units and quirks, what is unverified, and the prior art |
+| [Development](docs/development.md) | Checks, layout, rules, releases, going public |
 
 ---
 
 ## ⚙️ Configuration
 
-The setup form asks for the Bright **email** and **password**. Setup fails with a clear error if the details are rejected, if Glowmarkt cannot be reached, or if the account has no meters yet.
+The guided setup asks for the Bright **email** and **password**, shows the meters it found, and with more than one site lets you choose which to import. It stops with a clear message if the details are rejected, if Glowmarkt cannot be reached, or if the account has no electricity or gas meter yet.
 
 | Option | Default | What it does |
 |---|---|---|
@@ -154,9 +172,10 @@ Bright-Home-Assistant/
 ├── scripts/
 │   └── install-on-ha.sh     # 📦 ship the committed component to an HA host over SSH
 ├── tools/
-│   ├── gen_diagram.py       # 🗺️ draws docs/assets/architecture-*.svg
-│   └── gen_docs.py          # 🤖 the README's statistics and sensor tables
-├── docs/assets/             # 🖼️ banner, and the architecture diagram light and dark
+│   ├── gen_diagram.py       # 🗺️ draws the diagrams in docs/assets/
+│   └── gen_docs.py          # 🤖 the statistics and sensor tables (README, docs/entities.md)
+├── docs/                    # 📚 setup, energy dashboard, entities, how it works, API, development
+│   └── assets/              # 🖼️ banner and diagrams, light and dark
 ├── .github/                 # 🤖 tests + hassfest workflows, dependabot
 ├── Makefile                 # 🔧 venv, check, test, lint, diagram, install
 ├── .env.example             # ⚙️ the install script's SSH target
@@ -192,6 +211,8 @@ The Bright credentials stay in the Home Assistant config entry and go only to `a
 ## 📄 License
 
 MIT, see [LICENSE](LICENSE). Started from [existentia/hildebrand-glow-ha](https://github.com/existentia/hildebrand-glow-ha) v0.1.2 by Neil J, also MIT; its licence is kept in the component.
+
+Hildebrand, Glow, Glowmarkt and Bright are Hildebrand's names, used here only to say what this integration works with.
 
 ---
 

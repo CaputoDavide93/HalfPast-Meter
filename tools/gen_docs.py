@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate the README's entity and statistics tables from the integration.
+"""Regenerate the entity and statistics tables from the integration.
 
 The sources of truth are `SUPPORTED_CLASSIFIERS` in const.py (which streams
 exist, which are costs, which fuel prices them) and the entity names in
@@ -7,7 +7,7 @@ translations/en.json. sensor.py builds the same set from the same two places,
 and tests/test_init.py pins the resulting entity ids, so a table that drifts
 from the code fails here first.
 
-  python3 tools/gen_docs.py          # rewrite the AUTOGEN blocks in README.md
+  python3 tools/gen_docs.py          # rewrite the AUTOGEN blocks
   python3 tools/gen_docs.py --check  # exit 1 if they are stale (for CI)
 """
 
@@ -22,6 +22,11 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "custom_components" / "bright_meter"
 README = ROOT / "README.md"
+# Every file carrying AUTOGEN blocks, and the blocks each must have.
+TARGETS = {
+    README: ("entities", "statistics"),
+    ROOT / "docs" / "entities.md": ("entities", "statistics"),
+}
 
 
 def _const():
@@ -73,13 +78,14 @@ def statistics() -> str:
 BLOCKS = {"entities": entities, "statistics": statistics}
 
 
-def render(text: str) -> str:
-    for name, fn in BLOCKS.items():
+def render(text: str, names: tuple[str, ...], path: pathlib.Path) -> str:
+    for name in names:
+        fn = BLOCKS[name]
         pattern = re.compile(
             rf"(<!-- AUTOGEN:{name} -->\n)(?:.*?\n)?(<!-- /AUTOGEN:{name} -->)", re.S
         )
         if not pattern.search(text):
-            sys.exit(f"README.md has no AUTOGEN:{name} block")
+            sys.exit(f"{path.name} has no AUTOGEN:{name} block")
         text = pattern.sub(
             lambda m, fn=fn: m.group(1) + fn() + "\n" + m.group(2), text
         )
@@ -87,16 +93,23 @@ def render(text: str) -> str:
 
 
 def main() -> None:
-    current = README.read_text(encoding="utf-8")
-    fresh = render(current)
+    stale = []
+    for path, names in TARGETS.items():
+        current = path.read_text(encoding="utf-8")
+        fresh = render(current, names, path)
+        if fresh == current:
+            continue
+        if "--check" in sys.argv[1:]:
+            stale.append(str(path.relative_to(ROOT)))
+        else:
+            path.write_text(fresh, encoding="utf-8")
+            print(f"{path.relative_to(ROOT)} AUTOGEN blocks written")
+    if stale:
+        print("stale AUTOGEN blocks (run python3 tools/gen_docs.py):\n  "
+              + "\n  ".join(stale))
+        sys.exit(1)
     if "--check" in sys.argv[1:]:
-        if fresh != current:
-            print("README.md AUTOGEN blocks are stale (run python3 tools/gen_docs.py)")
-            sys.exit(1)
-        print("README.md AUTOGEN blocks up to date")
-        return
-    README.write_text(fresh, encoding="utf-8")
-    print("README.md AUTOGEN blocks written")
+        print("AUTOGEN blocks up to date")
 
 
 if __name__ == "__main__":

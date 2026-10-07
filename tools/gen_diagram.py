@@ -254,8 +254,90 @@ def architecture(scheme):
     )
     return k.render()
 
+
+def import_pass(scheme):
+    """One 30-minute pass, end to end. A sequence, so it gets lifelines."""
+    k = Canvas(1180, 640, scheme,
+               "Every 30 minutes bright_meter asks Glowmarkt how far each stream "
+               "reaches, then a background import reads the hourly readings, checks "
+               "them, and writes them to the recorder in one batch.")
+    c = k.c
+    B, G, R = 150, 590, 1030
+    lanes = [("bright_meter", B, "refresh"), ("Glowmarkt API", G, "cloud"),
+             ("HA recorder", R, "database")]
+    top, bottom = 84, 574
+    for name, x, icon in lanes:
+        w = 196
+        tone = "accent" if name == "bright_meter" else "plain"
+        k.add(k.box(x - w / 2, 26, w, 44, name, icon=icon, tone=tone),
+              f'<line x1="{x}" y1="{top - 14}" x2="{x}" y2="{bottom}" '
+              f'stroke="{c["border"]}" stroke-width="1" stroke-dasharray="4 5"/>')
+
+    def msg(y, x1, x2, text, *, dash=False):
+        return k.edge([(x1, y), (x2, y)], label=text, dash=dash)
+
+    def self_msg(y, x, text):
+        return (k.edge([(x, y), (x + 54, y), (x + 54, y + 26), (x + 6, y + 26)]) +
+                k.text(x + 66, y + 4, text, size=11.5, font=MONO, colour=c["chip"]))
+
+    def block(y, h, title):
+        return (f'<rect x="{B - 120}" y="{y}" width="{R - B + 240}" height="{h}" rx="8" '
+                f'fill="none" stroke="{c["border"]}" stroke-width="1" '
+                f'stroke-dasharray="5 4"/>'
+                + k.text(B - 106, y + 18, title, size=11.5, colour=c["sub"],
+                         weight="600"))
+
+    k.add(
+        block(92, 150, "the poll, every 30 minutes"),
+        msg(132, B + 8, G - 8, "catchup (at most every 2 h)"),
+        msg(170, B + 8, G - 8, "last-time, each stream"),
+        msg(204, G - 8, B + 8, "newest half-hour held", dash=True),
+        msg(232, B + 8, G - 8, "tariff (every 6 h)"),
+        block(260, 300, "then in the background, the import, per stream"),
+        msg(300, B + 8, R - 8, "last stored hour, and the total before the window"),
+        msg(332, R - 8, B + 8, "anchor sum", dash=True),
+        msg(370, B + 8, G - 8, "readings PT1H nulls=1, 30-day chunks"),
+        msg(404, G - 8, B + 8, "[hour, kWh or null] rows", dash=True),
+        self_msg(426, B, "one row per hour, in order; errors stop the pass"),
+        msg(482, B + 8, R - 8, "hours already stored in the window"),
+        self_msg(504, B, "readings + flat rows for stored gaps"),
+        msg(548, B + 8, R - 8, "async_add_external_statistics, one batch"),
+        k.footer("Nothing is written until every read has succeeded, so a failure "
+                 "leaves the stored history exactly as it was."),
+    )
+    return k.render()
+
+
+def setup_flow(scheme):
+    """The guided setup's four pages, left to right."""
+    k = Canvas(1180, 262, scheme,
+               "Setup is four pages: sign in, see the meters and how far their data "
+               "reaches, choose how much history, then the exact Energy dashboard "
+               "statistics to pick.")
+    W, H = 250, 128
+    xs, top = [24, 318, 612, 906], 52
+    mid = top + H / 2
+    k.add(
+        k.box(xs[0], top, W, H, "1. Sign in", ["Bright app email and",
+              "password, checked live"], icon="key"),
+        k.box(xs[1], top, W, H, "2. Your meters", ["each stream and how far",
+              "its data reaches"], icon="search"),
+        k.box(xs[2], top, W, H, "3. History", ["days to import on the",
+              "first pass (365)"], icon="calendar"),
+        k.box(xs[3], top, W, H, "4. Energy dashboard", ["which statistic goes",
+              "in which field"], icon="chart", tone="accent"),
+        k.edge([(xs[0] + W + 8, mid), (xs[1] - 8, mid)]),
+        k.edge([(xs[1] + W + 8, mid), (xs[2] - 8, mid)]),
+        k.edge([(xs[2] + W + 8, mid), (xs[3] - 8, mid)]),
+        k.footer("Page 4 also names any sources the dashboard already has, so the "
+                 "same meter is never counted twice."),
+    )
+    return k.render()
+
 DIAGRAMS = {
     "architecture": architecture,
+    "import-pass": import_pass,
+    "setup-flow": setup_flow,
 }
 
 def main() -> None:

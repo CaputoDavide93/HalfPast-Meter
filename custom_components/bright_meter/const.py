@@ -16,6 +16,8 @@ BASE_URL: Final = "https://api.glowmarkt.com/api/v0-1"
 APPLICATION_ID: Final = "b0f1b774-a586-4f72-9edd-27ead8aa7a8d"
 
 CONF_BACKFILL_DAYS: Final = "backfill_days"
+# The Bright sites (virtual entities) chosen in setup. Absent: every site.
+CONF_SITES: Final = "sites"
 DEFAULT_BACKFILL_DAYS: Final = 365
 MAX_BACKFILL_DAYS: Final = 3650
 

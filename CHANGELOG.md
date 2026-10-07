@@ -5,6 +5,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A guided setup in four pages: sign in; your meters, with how far each
+  stream's data reaches and, for an account with several sites, which to
+  import; how much history; and the exact statistic for each Energy dashboard
+  field, naming any sources the dashboard already has.
+- Documentation in `docs/`: setup, the Energy dashboard, statistics and
+  sensors, how it works, troubleshooting, the Glowmarkt API, development; and
+  two more diagrams (the setup pages, one import pass).
+- The sign-in page and README say the integration works with Hildebrand Glow's
+  Bright app, and is not affiliated with Hildebrand or Glow.
+- `after_dependencies: [energy]` in the manifest: the setup reads the Energy
+  dashboard's sources (Hassfest requires it). `make hassfest` runs the same
+  validation locally.
+- Brand icon and logo (a house holding half-hourly bars, with "Smart Meter" set
+  in Inter, SIL OFL), each in light and dark versions, and a README banner.
+
 Fixes from an independent code review; each has a regression test.
 
 ### Fixed
@@ -32,9 +49,6 @@ Fixes from an independent code review; each has a regression test.
 - The last-full-day sensors work with a one-day history depth: the sensors'
   week is read whatever the depth.
 
-### Added
-
-- Brand icons (light and dark) and a README banner.
 
 ## [0.2.0] - 2026-10-06
 

@@ -17,7 +17,7 @@ from custom_components.bright_meter.api import (
 )
 from custom_components.bright_meter.const import DOMAIN
 
-from .const import PASSWORD, USERNAME, VIRTUAL_ENTITIES
+from .const import PASSWORD, USERNAME, VIRTUAL_ENTITIES, FakeGlowmarktClient
 
 CLIENT_PATH = "custom_components.bright_meter.config_flow.GlowmarktClient"
 
@@ -33,25 +33,22 @@ def _mock_client(virtual_entities=VIRTUAL_ENTITIES, login_error=None):
 async def test_user_flow_creates_entry(
     bright_env, hass: HomeAssistant
 ) -> None:
-    """Valid credentials with at least one meter create an entry."""
+    """Valid credentials with at least one meter move on to the meters page."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     assert result["type"] is FlowResultType.FORM
 
-    with (
-        patch(CLIENT_PATH, return_value=_mock_client()),
-        patch("custom_components.bright_meter.async_setup_entry", return_value=True),
-    ):
+    with patch(CLIENT_PATH, return_value=FakeGlowmarktClient()):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {CONF_USERNAME: USERNAME, CONF_PASSWORD: PASSWORD},
         )
-        await hass.async_block_till_done()
 
-    assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["title"] == USERNAME
-    assert result["data"] == {CONF_USERNAME: USERNAME, CONF_PASSWORD: PASSWORD}
+    # Signing in leads to the meters page; the rest of the guided setup is
+    # walked through in test_guided_setup.py.
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "meters"
 
 
 @pytest.mark.parametrize(
