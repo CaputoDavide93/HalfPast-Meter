@@ -28,6 +28,7 @@ to a beta.
 | `tests/const.py` | `FakeGlowmarktClient`: the API, including its misbehaviour |
 | `tools/gen_diagram.py` | The diagrams in `docs/assets/` |
 | `tools/gen_docs.py` | The statistics and sensor tables in the README and `entities.md` |
+| `tests/test_hacs.py` | HACS's own `hacs.json` and manifest schemas, structure and brand icon |
 
 ## Rules
 
@@ -55,7 +56,12 @@ to a beta.
 When it has run well on a live account for a few weeks:
 
 - [ ] Make the repository public.
-- [ ] Add the HACS validation workflow and scheduled CI (weekly Hassfest and a
-      latest-HA canary).
-- [ ] Replace the install script in the README with HACS instructions.
+- [ ] Remove the `ignore:` line from `.github/workflows/validate.yaml`: HACS's
+      action can then read `hacs.json` and the manifest itself (until then,
+      `tests/test_hacs.py` checks them against HACS's own schemas).
+- [ ] Add scheduled CI: weekly Hassfest and HACS validation, and a latest-HA
+      canary.
+- [ ] In the README and `docs/setup.md`, make HACS the first install route and
+      drop "once this repository is public"; add the my.home-assistant HACS
+      button.
 - [ ] Check every doc for anything private: hostnames, account details.

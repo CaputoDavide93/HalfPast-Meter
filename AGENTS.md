@@ -47,8 +47,10 @@ v0.1.2 under MIT; keep both copyright lines in `LICENSE` and the upstream
   install.
 - **Private for now**, so HACS cannot install it: `scripts/install-on-ha.sh`
   ships the committed component over SSH. It goes public once proven on a live
-  account; then add the HACS validation workflow and scheduled CI. Brand
-  images are in `custom_components/bright_meter/brand/` (light and dark).
+  account; then follow "Going public" in `docs/development.md` (the HACS
+  workflow's `ignore:` line must go). The repo is otherwise HACS-ready, pinned
+  by `tests/test_hacs.py`. Brand images are in
+  `custom_components/bright_meter/brand/` (light and dark).
 - **Rules the importer keeps, each pinned by a test:** readings are requested
   with `nulls=1` and malformed answers raise; nothing at or after `last-time`
   is imported; a gap is never a row; hours are de-duplicated and summed in time

@@ -5,8 +5,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-07
+
 ### Added
 
+- HACS readiness: HACS's validation action in CI, and `tests/test_hacs.py`
+  checking `hacs.json` and the manifest against HACS's own schemas, which its
+  action cannot read while the repository is private.
 - A guided setup in four pages: sign in; your meters, with how far each
   stream's data reaches and, for an account with several sites, which to
   import; how much history; and the exact statistic for each Energy dashboard

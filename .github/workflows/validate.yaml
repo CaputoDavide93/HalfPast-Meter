@@ -23,3 +23,8 @@ jobs:
         uses: hacs/action@1ebf01c408f29afcb6406bd431bc98fd8cbb15aa
         with:
           category: integration
+          # While the repository is private, HACS's action fetches hacs.json and
+          # the manifest anonymously and gets a 404, so these two checks cannot
+          # pass. tests/test_hacs.py makes them locally with HACS's own schemas.
+          # REMOVE THIS LINE when the repository goes public.
+          ignore: hacsjson integration_manifest
