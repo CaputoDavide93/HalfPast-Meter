@@ -1,0 +1,25 @@
+name: HACS Validation
+
+# HACS's own checks: repository structure, hacs.json, manifest, brand icon,
+# description, topics. Push and pull request only while the repository is
+# private, to keep Actions minutes for the checks that matter.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate with HACS Action
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: HACS validation
+        uses: hacs/action@1ebf01c408f29afcb6406bd431bc98fd8cbb15aa
+        with:
+          category: integration
