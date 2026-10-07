@@ -16,7 +16,8 @@ All notable changes to this project are documented here. The format follows
   two more diagrams (the setup pages, one import pass).
 - The sign-in page and README say the integration works with Hildebrand Glow's
   Bright app, and is not affiliated with Hildebrand or Glow.
-- Brand icons (light and dark) and a README banner.
+- Brand icon and logo (a house holding half-hourly bars, with "Smart Meter" set
+  in Inter, SIL OFL), each in light and dark versions, and a README banner.
 
 Fixes from an independent code review; each has a regression test.
 

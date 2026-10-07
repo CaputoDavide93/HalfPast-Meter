@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/banner.png" alt="A lightbulb holding a small bar chart, beside half-hourly bars of electricity in amber and gas in blue." width="100%">
+<img src="docs/assets/banner.png" alt="A house outline holding a small bar chart, beside half-hourly bars of electricity in amber and gas in blue." width="100%">
 
 # 💡 Bright Smart Meter for Home Assistant
 
