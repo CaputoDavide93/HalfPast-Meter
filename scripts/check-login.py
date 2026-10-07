@@ -10,13 +10,18 @@ prints each answer's HTTP status, by stream type only: no ids, no names.
 Nothing is stored or sent anywhere else.
 
   python3 scripts/check-login.py
+
+It asks for the email and password, or reads BRIGHT_EMAIL and BRIGHT_PASSWORD
+from the repository's git-ignored .env when both are set there.
 """
 
 from __future__ import annotations
 
 import getpass
 import json
+import pathlib
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -84,13 +89,16 @@ def discover(username: str, password: str) -> None:
             classifier = res.get("classifier") or "?"
             used = "used" if classifier in SUPPORTED else "ignored"
             active = "" if res.get("active", True) else ", inactive"
+            started = time.monotonic()
             status, body = get(f"/resource/{res.get('resourceId')}/last-time", token)
+            took = time.monotonic() - started
             reach = (body or {}).get("data", {}) if isinstance(body, dict) else {}
             stamp = reach.get("lastTs") if isinstance(reach, dict) else None
             detail = "has data" if stamp else "no data yet"
             if status >= 400:
                 detail = f"error {body!r}"[:80]
-            print(f"    {classifier} ({used}{active}): HTTP {status}, {detail}")
+            print(f"    {classifier} ({used}{active}): "
+                  f"HTTP {status} {took:.1f}s, {detail}")
 
 
 def sign_in(username: str, password: str) -> tuple[int, bool]:
@@ -108,9 +116,29 @@ def sign_in(username: str, password: str) -> tuple[int, bool]:
         return err.code, False
 
 
+def _from_env_file() -> tuple[str, str] | None:
+    """BRIGHT_EMAIL and BRIGHT_PASSWORD from .env, if both are there."""
+    path = pathlib.Path(__file__).resolve().parents[1] / ".env"
+    if not path.is_file():
+        return None
+    values: dict[str, str] = {}
+    for line in path.read_text().splitlines():
+        if "=" in line and not line.lstrip().startswith("#"):
+            key, _, value = line.partition("=")
+            values[key.strip()] = value.strip().strip("'\"")
+    if values.get("BRIGHT_EMAIL") and values.get("BRIGHT_PASSWORD"):
+        return values["BRIGHT_EMAIL"], values["BRIGHT_PASSWORD"]
+    return None
+
+
 def main() -> int:
-    username = input("Bright email: ")
-    password = getpass.getpass("Bright password (hidden): ")
+    stored = _from_env_file()
+    if stored:
+        username, password = stored
+        print("Using BRIGHT_EMAIL and BRIGHT_PASSWORD from .env")
+    else:
+        username = input("Bright email: ")
+        password = getpass.getpass("Bright password (hidden): ")
 
     status, ok = sign_in(username, password)
     print(f"As typed: HTTP {status}, {'ACCEPTED' if ok else 'rejected'}")

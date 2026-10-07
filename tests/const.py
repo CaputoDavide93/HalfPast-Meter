@@ -145,8 +145,10 @@ class FakeGlowmarktClient:
         self.tariff_errors: set[str] = set()
         self.resources_error: Exception | None = None
         self.readings_gate: asyncio.Event | None = None
-        # Resource ids Bright refuses (401/403 even with a fresh session).
+        # Resource ids Bright refuses (401/403 even with a fresh session), and
+        # resource ids whose calls fail some other way (an HTTP 500, say).
         self.refused: set[str] = set()
+        self.failing: set[str] = set()
         self.tariffs: dict[str, Tariff | None] = {
             RES_ELEC: TARIFF_ELEC,
             RES_GAS: TARIFF_GAS,
@@ -188,6 +190,8 @@ class FakeGlowmarktClient:
         """The second half-hour of the last collected hour."""
         if resource_id in self.refused:
             raise GlowmarktAccessDeniedError(f"refused {resource_id}")
+        if resource_id in self.failing:
+            raise GlowmarktConnectionError(f"GET {resource_id} failed with HTTP 500")
         return self._uncollected_from() - timedelta(minutes=30)
 
     async def async_get_tariff(self, resource_id: str) -> Tariff | None:
@@ -211,6 +215,8 @@ class FakeGlowmarktClient:
         self.readings_calls.append((resource_id, period))
         if resource_id in self.refused:
             raise GlowmarktAccessDeniedError(f"refused {resource_id}")
+        if resource_id in self.failing:
+            raise GlowmarktConnectionError(f"GET {resource_id} failed with HTTP 500")
         if self.readings_gate is not None:
             await self.readings_gate.wait()
         if self.fail_readings_call == len(self.readings_calls):

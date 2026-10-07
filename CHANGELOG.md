@@ -5,6 +5,26 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-10-07
+
+### Fixed
+
+- **One stream's error no longer stops setup.** Seen on a live account: with
+  the gas meter broken at Bright's end, setup said "Could not reach Bright"
+  although the login and electricity were fine. Any error for one stream (not
+  only a refusal) now marks that stream on the meters page and setup carries
+  on; the poll and the import skip it, warn once until it answers again, and
+  retry it every pass. Only failing to list the meters, or every stream
+  failing at once, is treated as Bright being unreachable.
+- Setup logs which call failed and what Bright answered, instead of only
+  showing "Could not reach Bright"; the client logs every request's path and
+  status at debug level.
+
+### Added
+
+- `scripts/check-login.py` can read `BRIGHT_EMAIL` and `BRIGHT_PASSWORD` from
+  the git-ignored `.env`, and times each stream's call.
+
 ## [0.3.3] - 2026-10-07
 
 ### Fixed

@@ -88,6 +88,8 @@ class _Stream:
     # Bright refused to say how far this stream reaches (seen for a meter it is
     # still fixing). Kept: it fills in on its own once Bright shares it.
     refused: bool = False
+    # Any other error Bright answered for this stream, for the meters page.
+    error: str | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -112,11 +114,19 @@ async def _async_discover(client: GlowmarktClient) -> list[_Site]:
             resource_id = resource.get("resourceId")
             if info is None or not resource_id or resource.get("active") is False:
                 continue
+            # One stream's trouble is that stream's: the others carry on, and
+            # the log says which stream and what Bright answered.
+            last_time: datetime | None = None
+            refused = False
+            error: str | None = None
             try:
                 last_time = await client.async_get_last_time(resource_id)
-                refused = False
-            except GlowmarktAccessDeniedError:
-                last_time, refused = None, True
+            except GlowmarktAccessDeniedError as err:
+                refused = True
+                _LOGGER.warning("Bright refuses %s during setup: %s", classifier, err)
+            except GlowmarktConnectionError as err:
+                error = str(err)
+                _LOGGER.warning("Bright answered an error for %s: %s", classifier, err)
             streams.append(
                 _Stream(
                     resource_id=resource_id,
@@ -124,6 +134,7 @@ async def _async_discover(client: GlowmarktClient) -> list[_Site]:
                     info=info,
                     last_time=last_time,
                     refused=refused,
+                    error=error,
                 )
             )
         if streams:
@@ -133,8 +144,15 @@ async def _async_discover(client: GlowmarktClient) -> list[_Site]:
     return sites
 
 
-def _reach(last_time: datetime | None, *, refused: bool = False) -> str:
+def _reach(
+    last_time: datetime | None, *, refused: bool = False, error: str | None = None
+) -> str:
     """How far a stream's data reaches, in local time, for a person to read."""
+    if error:
+        return (
+            "Bright answered an error for this stream; it imports on its own once "
+            "that clears (the log has the details)"
+        )
     if refused:
         return (
             "Bright refuses to share this stream's data yet (often a meter it is "
@@ -151,7 +169,8 @@ def _meters_text(sites: list[_Site]) -> str:
     for site in sites:
         lines.append(f"**{site.name}**")
         lines += [
-            f"- {stream.info.label}: {_reach(stream.last_time, refused=stream.refused)}"
+            f"- {stream.info.label}: "
+            f"{_reach(stream.last_time, refused=stream.refused, error=stream.error)}"
             for stream in site.streams
             if not stream.info.is_cost
         ]
@@ -258,7 +277,8 @@ class GlowmarktConfigFlow(ConfigFlow, domain=DOMAIN):
             except GlowmarktAccessDeniedError:
                 # Signed in, but Bright would not list the account's meters.
                 errors["base"] = "access_denied"
-            except GlowmarktConnectionError:
+            except GlowmarktConnectionError as err:
+                _LOGGER.warning("Setup could not list the Bright meters: %s", err)
                 errors["base"] = "cannot_connect"
             except Exception:
                 _LOGGER.exception("Unexpected error validating Glowmarkt credentials")

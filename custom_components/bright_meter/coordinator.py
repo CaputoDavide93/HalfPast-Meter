@@ -171,8 +171,9 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
         self._data_until: dict[str, datetime | None] = {}
         self._tariffs: dict[str, Tariff | None] = {}
         self._tariffs_read: datetime | None = None
-        # Streams Bright has refused, so the warning is logged once each.
-        self._refused: set[str] = set()
+        # Streams in trouble (refused or erroring), so each is warned about once
+        # until it answers again.
+        self._stream_trouble: set[str] = set()
 
     @property
     def _backfill_days(self) -> int:
@@ -263,16 +264,23 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
         await self._async_catchup_if_due()
 
         try:
+            failures: list[GlowmarktConnectionError] = []
             for resource in self.resources:
                 try:
                     self._last_times[resource.resource_id] = (
                         await self.client.async_get_last_time(resource.resource_id)
                     )
-                except GlowmarktAccessDeniedError as err:
-                    # One stream Bright will not share (a meter it is still
-                    # fixing, say) must not take the others down with it.
+                    self._stream_trouble.discard(resource.resource_id)
+                except GlowmarktConnectionError as err:
+                    # One stream Bright will not share or answers an error for
+                    # (a meter it is still fixing, say) must not take the
+                    # others down with it.
                     self._last_times[resource.resource_id] = None
-                    self._note_refused(resource, err)
+                    self._note_stream_trouble(resource, err)
+                    failures.append(err)
+            if failures and len(failures) == len(self.resources):
+                # Nothing answered: that is Bright being down, not one stream.
+                raise failures[0]
             await self._async_read_tariffs_if_due()
         except GlowmarktAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
@@ -285,18 +293,25 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
 
         return self._snapshot()
 
-    def _note_refused(
-        self, resource: GlowmarktResource, err: GlowmarktAccessDeniedError
+    def _note_stream_trouble(
+        self, resource: GlowmarktResource, err: GlowmarktConnectionError
     ) -> None:
-        """Say once per stream that Bright is refusing it, then keep quiet."""
-        if resource.resource_id not in self._refused:
-            self._refused.add(resource.resource_id)
-            _LOGGER.warning(
-                "Bright refuses to share %s for now; the other streams carry on, "
-                "and it imports on its own once Bright shares it (%s)",
-                resource.statistic_id,
-                err,
-            )
+        """Warn once per stream, until it answers again, then keep quiet."""
+        if resource.resource_id in self._stream_trouble:
+            return
+        self._stream_trouble.add(resource.resource_id)
+        what = (
+            "refuses to share"
+            if isinstance(err, GlowmarktAccessDeniedError)
+            else "answered an error for"
+        )
+        _LOGGER.warning(
+            "Bright %s %s; the other streams carry on, and it is retried every "
+            "pass (%s)",
+            what,
+            resource.statistic_id,
+            err,
+        )
 
     def _snapshot(self) -> BrightData:
         """The entity view of what the last import and tariff read found."""
@@ -492,8 +507,10 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
             for resource in self.resources:
                 try:
                     await self._async_backfill_resource(resource)
-                except GlowmarktAccessDeniedError as err:
-                    self._note_refused(resource, err)
+                except GlowmarktConnectionError as err:
+                    # This stream's import stops here, writing nothing; the
+                    # others go ahead, and the next pass tries it again.
+                    self._note_stream_trouble(resource, err)
 
             await self._store.async_save(self._depth_applied)
 
