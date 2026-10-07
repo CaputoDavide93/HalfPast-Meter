@@ -2,8 +2,8 @@
   "config": {
     "step": {
       "user": {
-        "title": "Bright smart meter",
-        "description": "Sign in with the account you use for the Bright app. Your smart meter must already be set up and verified in Bright.",
+        "title": "Sign in to Bright",
+        "description": "Use the email and password of the Bright app, Hildebrand Glow's free smart-meter app. Your meter must already be set up in the app and sharing its data. This integration is independent and not affiliated with Hildebrand or Glow.",
         "data": {
           "username": "Email address",
           "password": "Password"
@@ -22,13 +22,38 @@
         "data_description": {
           "password": "Your current Bright app password."
         }
+      },
+      "meters": {
+        "title": "Your meters",
+        "description": "Bright found these meters, and this is how far each one's data reaches. Readings arrive half-hourly, 30 minutes to two days late; a meter with no readings yet fills in on its own once they arrive.\n\n{meters}",
+        "data": {
+          "sites": "Sites to import"
+        },
+        "data_description": {
+          "sites": "Each Bright site is one property. Untick any you do not want in this Home Assistant."
+        }
+      },
+      "history": {
+        "title": "How much history",
+        "description": "On the first pass the integration imports past readings into the Energy dashboard, each hour where it happened. After that it re-reads the last week every 30 minutes, so late readings fill in by themselves.",
+        "data": {
+          "backfill_days": "Days of history to import"
+        },
+        "data_description": {
+          "backfill_days": "365 imports a year, if Bright holds that much. You can change it later in the integration's options: raising it rebuilds the history from the new depth."
+        }
+      },
+      "energy": {
+        "title": "Energy dashboard",
+        "description": "After setup, open **Settings, Dashboards, Energy** and choose these statistics, each in the field named:\n\n{statistics}\n\n{existing}\n\nSelect **Submit** to finish setup. History starts importing in the background straight away."
       }
     },
     "error": {
       "cannot_connect": "Could not reach Bright (api.glowmarkt.com). Check the internet connection and try again.",
       "invalid_auth": "Bright rejected those details. Use the same email and password as the Bright app.",
-      "no_meters": "Signed in successfully, but no meters were found on this account. Complete meter setup in the Bright app first.",
-      "unknown": "Something unexpected went wrong. Check the Home Assistant log for details."
+      "no_meters": "Signed in, but this account has no electricity or gas meter yet. Finish setting up your meter in the Bright app first.",
+      "unknown": "Something unexpected went wrong. Check the Home Assistant log for details.",
+      "no_site_selected": "Choose at least one site."
     },
     "abort": {
       "already_configured": "This Bright account is already set up.",

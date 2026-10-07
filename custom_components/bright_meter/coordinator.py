@@ -40,6 +40,7 @@ from .const import (
     BACKFILL_SHUTDOWN_TIMEOUT,
     CATCHUP_INTERVAL,
     CONF_BACKFILL_DAYS,
+    CONF_SITES,
     CURRENCY_GBP,
     DEFAULT_BACKFILL_DAYS,
     DOMAIN,
@@ -186,10 +187,14 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
         except GlowmarktConnectionError as err:
             raise UpdateFailed(str(err)) from err
 
+        # Sites chosen in the guided setup; an entry without the key takes all.
+        chosen = self.config_entry.data.get(CONF_SITES)
         discovered: list[dict[str, Any]] = []
         for entity in virtual_entities:
             ve_id = entity.get("veId")
             if not ve_id:
+                continue
+            if chosen is not None and ve_id not in chosen:
                 continue
             ve_name = entity.get("name") or "Glowmarkt"
             try:
