@@ -5,6 +5,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-07
+
+### Changed
+
+- The integration is now called **HalfPast Meter**, in Home Assistant's
+  integration list, in HACS and in the docs. Chosen after a survey of the
+  field: "Halfhour" was taken by another Home Assistant integration in
+  September 2026, and "X Energy", "Power X" and "X Meter" names crowd HACS.
+  The domain `bright_meter` and every `bright_meter:` statistic id are
+  unchanged, so nothing imported is lost.
+- A simpler mark: three rising bars on a rounded tile, drawn as flat shapes,
+  with light and dark versions; the wide logo and the banner use it.
+
 ## [0.3.0] - 2026-10-07
 
 ### Added
