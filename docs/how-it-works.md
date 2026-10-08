@@ -47,7 +47,8 @@ local MQTT, which this integration does not read.
    widening steps (30, 400, then 3,680 days) so a long gap never restarts the
    total at zero.
 4. **The reads.** Hourly readings (`PT1H`, `nulls=1`, `offset=0`) in 30-day
-   chunks, 0.2 s apart. The sensors' own week is always read too, whatever the
+   chunks, 0.2 s apart, each allowed 90 s. A chunk that times out is split in
+   half and each half read on its own, down to a single day. The sensors' own week is always read too, whatever the
    depth.
 5. **The checks.** Every row on the hour, one reading per hour, in time order.
    A repeated identical hour is kept once; two different readings for one hour,

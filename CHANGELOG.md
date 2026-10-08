@@ -5,6 +5,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-08
+
+### Fixed
+
+- **A slow stretch of history no longer blocks a stream's import.** Seen on a
+  live account: the first import of a year of hourly electricity stopped with
+  "Could not reach the Glowmarkt API: " because one 30-day chunk took longer
+  than 45 s. A readings request that times out is now split in half and each
+  half read on its own, down to a single day, and readings get a 90 s limit.
+- Errors say what happened: a timeout is "timed out after N s", and other
+  connection errors name their type, instead of an empty message.
+
 ## [0.4.0] - 2026-10-08
 
 ### Added
