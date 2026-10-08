@@ -22,7 +22,8 @@ Base `https://api.glowmarkt.com/api/v0-1`, every call with `applicationId`
 | `GET /resource/{id}/catchup` | Ask Glowmarkt to fetch from the DCC | Failures are ignored; stale data is the only cost |
 | `GET /resource/{id}/tariff` | The rates the meter holds | Two documented shapes, both parsed; may be empty |
 
-Requests time out after 45 seconds.
+Requests time out after 45 seconds, readings after 90: a month of hourly
+readings can take Glowmarkt longer than 45 seconds to assemble.
 
 ## Streams
 

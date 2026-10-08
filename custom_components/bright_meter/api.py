@@ -21,6 +21,8 @@ from .const import APPLICATION_ID, BASE_URL, FUNCTION_SUM
 _LOGGER = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT: Final = ClientTimeout(total=45)
+# A month of hourly readings can take Glowmarkt well over 45 s to assemble.
+READINGS_TIMEOUT: Final = ClientTimeout(total=90)
 
 # Tokens are documented as lasting 7 days. Renew an hour early so a long-running
 # request can never straddle the expiry.
@@ -39,6 +41,10 @@ class GlowmarktAuthError(GlowmarktError):
 
 class GlowmarktConnectionError(GlowmarktError):
     """The API could not be reached, or returned something unusable."""
+
+
+class GlowmarktTimeoutError(GlowmarktConnectionError):
+    """A request took longer than its time limit."""
 
 
 class GlowmarktAccessDeniedError(GlowmarktConnectionError):
@@ -196,9 +202,13 @@ class GlowmarktClient:
                 data = await response.json()
         except GlowmarktError:
             raise
-        except (ClientError, TimeoutError, ValueError) as err:
+        except TimeoutError as err:
+            raise GlowmarktTimeoutError(
+                f"Signing in timed out after {REQUEST_TIMEOUT.total:.0f} s"
+            ) from err
+        except (ClientError, ValueError) as err:
             raise GlowmarktConnectionError(
-                f"Could not reach the Glowmarkt API: {err}"
+                f"Could not reach the Glowmarkt API: {type(err).__name__}: {err}"
             ) from err
 
         # The API returns HTTP 200 with valid=false for a bad password, so the
@@ -222,7 +232,10 @@ class GlowmarktClient:
             return self._token
 
     async def _async_get(
-        self, path: str, params: dict[str, Any] | None = None
+        self,
+        path: str,
+        params: dict[str, Any] | None = None,
+        timeout: ClientTimeout = REQUEST_TIMEOUT,
     ) -> Any:
         """GET a path, retrying once if the token turns out to be dead."""
         for attempt in (1, 2):
@@ -237,7 +250,7 @@ class GlowmarktClient:
                     f"{BASE_URL}{path}",
                     params=params,
                     headers=headers,
-                    timeout=REQUEST_TIMEOUT,
+                    timeout=timeout,
                 ) as response:
                     _LOGGER.debug(
                         "GET %s -> HTTP %s (attempt %s)", path, response.status, attempt
@@ -262,9 +275,13 @@ class GlowmarktClient:
                     return await response.json()
             except GlowmarktError:
                 raise
-            except (ClientError, TimeoutError, ValueError) as err:
+            except TimeoutError as err:
+                raise GlowmarktTimeoutError(
+                    f"GET {path} timed out after {timeout.total:.0f} s"
+                ) from err
+            except (ClientError, ValueError) as err:
                 raise GlowmarktConnectionError(
-                    f"Could not reach the Glowmarkt API: {err}"
+                    f"Could not reach the Glowmarkt API: {type(err).__name__}: {err}"
                 ) from err
 
         raise GlowmarktConnectionError(f"GET {path} failed")
@@ -334,7 +351,9 @@ class GlowmarktClient:
             "function": function,
             "nulls": "1",
         }
-        result = await self._async_get(f"/resource/{resource_id}/readings", params)
+        result = await self._async_get(
+            f"/resource/{resource_id}/readings", params, timeout=READINGS_TIMEOUT
+        )
 
         return _parse_readings(result, resource_id)
 

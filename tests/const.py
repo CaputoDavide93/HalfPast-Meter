@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 from custom_components.bright_meter.api import (
     GlowmarktAccessDeniedError,
     GlowmarktConnectionError,
+    GlowmarktTimeoutError,
     Tariff,
 )
 
@@ -149,6 +150,9 @@ class FakeGlowmarktClient:
         # resource ids whose calls fail some other way (an HTTP 500, say).
         self.refused: set[str] = set()
         self.failing: set[str] = set()
+        # Readings requests spanning more than this many days time out, the
+        # way Glowmarkt does for a big stretch of history on some streams.
+        self.slow_over_days: dict[str, float] = {}
         self.tariffs: dict[str, Tariff | None] = {
             RES_ELEC: TARIFF_ELEC,
             RES_GAS: TARIFF_GAS,
@@ -217,6 +221,9 @@ class FakeGlowmarktClient:
             raise GlowmarktAccessDeniedError(f"refused {resource_id}")
         if resource_id in self.failing:
             raise GlowmarktConnectionError(f"GET {resource_id} failed with HTTP 500")
+        limit = self.slow_over_days.get(resource_id)
+        if limit is not None and (end - start).total_seconds() > limit * 86400:
+            raise GlowmarktTimeoutError(f"readings for {resource_id} timed out")
         if self.readings_gate is not None:
             await self.readings_gate.wait()
         if self.fail_readings_call == len(self.readings_calls):

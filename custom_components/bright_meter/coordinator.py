@@ -34,6 +34,7 @@ from .api import (
     GlowmarktClient,
     GlowmarktConnectionError,
     GlowmarktError,
+    GlowmarktTimeoutError,
     Tariff,
 )
 from .const import (
@@ -542,6 +543,45 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
                 )
             into[moment] = value
 
+    async def _async_read_span(
+        self,
+        resource: GlowmarktResource,
+        hourly: dict[datetime, float | None],
+        start: datetime,
+        end: datetime,
+    ) -> None:
+        """Read [start, end) into `hourly`, halving the span if it times out.
+
+        Glowmarkt can take longer than any sensible limit to assemble a month
+        of hourly readings for some streams. A span that times out is split in
+        two and each half read on its own, down to a single day; a day that
+        still times out fails the pass, and the next one tries again.
+        """
+        try:
+            readings = await self.client.async_get_readings(
+                resource.resource_id,
+                start.replace(tzinfo=None),
+                (end - timedelta(seconds=1)).replace(tzinfo=None),
+                PERIOD_HOURLY,
+                offset_minutes=0,
+            )
+        except GlowmarktTimeoutError:
+            if end - start <= timedelta(days=1):
+                raise
+            middle = start + (end - start) / 2
+            middle = middle.replace(minute=0, second=0, microsecond=0)
+            _LOGGER.debug(
+                "Readings for %s timed out over %s to %s; reading it in halves",
+                resource.statistic_id,
+                start.isoformat(),
+                end.isoformat(),
+            )
+            await self._async_read_span(resource, hourly, start, middle)
+            await asyncio.sleep(CHUNK_DELAY_SECONDS)
+            await self._async_read_span(resource, hourly, middle, end)
+            return
+        self._merge_readings(hourly, readings, start, end)
+
     async def _async_backfill_resource(self, resource: GlowmarktResource) -> None:
         """Import the hourly statistics this resource has data for.
 
@@ -642,14 +682,7 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
                 _LOGGER.debug("Home Assistant is stopping, abandoning backfill")
                 return
             chunk_end = min(chunk_start + timedelta(days=HOURLY_CHUNK_DAYS), data_until)
-            readings = await self.client.async_get_readings(
-                resource.resource_id,
-                chunk_start.replace(tzinfo=None),
-                (chunk_end - timedelta(seconds=1)).replace(tzinfo=None),
-                PERIOD_HOURLY,
-                offset_minutes=0,
-            )
-            self._merge_readings(hourly, readings, chunk_start, chunk_end)
+            await self._async_read_span(resource, hourly, chunk_start, chunk_end)
             chunk_start = chunk_end
             if chunk_start < data_until:
                 await asyncio.sleep(CHUNK_DELAY_SECONDS)
