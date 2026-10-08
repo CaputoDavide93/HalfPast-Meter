@@ -9,6 +9,7 @@ Streams are told apart by classifier and statistic id instead.
 
 from __future__ import annotations
 
+import re
 from dataclasses import asdict
 from typing import Any
 
@@ -17,11 +18,29 @@ from homeassistant.core import HomeAssistant
 from . import GlowmarktConfigEntry
 
 
+def _without_ids(text: str) -> str:
+    """A message with every resource and site id in a request path replaced."""
+    return re.sub(r"/(resource|virtualentity)/[^/\s]+", r"/\1/<id>", text)
+
+
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: GlowmarktConfigEntry
 ) -> dict[str, Any]:
-    """Return diagnostics for a config entry."""
-    coordinator = entry.runtime_data
+    """Return diagnostics for a config entry, loaded or not."""
+    coordinator = getattr(entry, "runtime_data", None)
+    if coordinator is None:
+        # Setting up, retrying after an error, or failed: there is nothing
+        # running to describe, but the state and its reason help most then.
+        return {
+            "entry": {
+                "options": dict(entry.options),
+                "state": entry.state.value,
+                # The reason can quote a request path, which names a resource.
+                "reason": _without_ids(entry.reason or ""),
+            },
+            "coordinator": {"loaded": False},
+            "streams": [],
+        }
     data = coordinator.data
 
     streams: list[dict[str, Any]] = []
@@ -45,8 +64,9 @@ async def async_get_config_entry_diagnostics(
         )
 
     return {
-        "entry": {"options": dict(entry.options)},
+        "entry": {"options": dict(entry.options), "state": entry.state.value},
         "coordinator": {
+            "loaded": True,
             "last_update_success": coordinator.last_update_success,
             "update_interval": (
                 coordinator.update_interval.total_seconds()
