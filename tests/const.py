@@ -195,7 +195,9 @@ class FakeGlowmarktClient:
         if resource_id in self.refused:
             raise GlowmarktAccessDeniedError(f"refused {resource_id}")
         if resource_id in self.failing:
-            raise GlowmarktConnectionError(f"GET {resource_id} failed with HTTP 500")
+            raise GlowmarktConnectionError(
+                f"GET /resource/{resource_id}/last-time failed with HTTP 500"
+            )
         return self._uncollected_from() - timedelta(minutes=30)
 
     async def async_get_tariff(self, resource_id: str) -> Tariff | None:

@@ -164,6 +164,12 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
         )
         self._depth_applied: dict[str, int] | None = None
         self._last_catchup: datetime | None = None
+        # Kept on disk: an in-memory timer restarted with every Home Assistant
+        # restart and setup retry, so the two-hour rule was not a rule.
+        self._catchup_store: Store[dict[str, str]] = Store(
+            hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}.catchup"
+        )
+        self._catchup_loaded = False
         self._backfill_task: asyncio.Task[None] | None = None
         # Per resource: the newest half-hour Glowmarkt holds, and the hourly
         # values of the refresh window (None for a gap), from the last backfill.
@@ -418,6 +424,11 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
         for every hour it has no data for — which looks exactly like a house
         that has stopped using electricity.
         """
+        if not self._catchup_loaded:
+            stored = await self._catchup_store.async_load() or {}
+            self._last_catchup = dt_util.parse_datetime(stored.get("last", "") or "")
+            self._catchup_loaded = True
+
         now = dt_util.utcnow()
         if (
             self._last_catchup is not None
@@ -426,6 +437,7 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
             return
 
         self._last_catchup = now
+        await self._catchup_store.async_save({"last": now.isoformat()})
         for resource in self.resources:
             await self.client.async_catchup(resource.resource_id)
 

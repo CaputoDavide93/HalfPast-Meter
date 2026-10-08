@@ -5,6 +5,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-08
+
+### Fixed
+
+- **The two-hour catch-up rule now holds across restarts.** The time of the
+  last DCC catch-up lived in memory, so every Home Assistant restart and every
+  setup retry asked Bright again; on a live account that coincided with Bright
+  answering HTTP 500 for every electricity stream. It is now stored per entry.
+- Diagnostics no longer fail while the entry is setting up or retrying; they
+  report the state and its reason, with resource and site ids removed.
+
 ## [0.4.1] - 2026-10-08
 
 ### Fixed
