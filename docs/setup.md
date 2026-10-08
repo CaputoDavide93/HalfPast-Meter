@@ -60,7 +60,7 @@ a time that suits the house.
 | **Sign in to Bright** | Enter the Bright app's email and password | An error if they are rejected, Bright cannot be reached, or the account has no electricity or gas meter yet |
 | **Your meters** | With more than one site, untick any you do not want | Every electricity, gas and export stream, and how far its data reaches in local time, or *no readings yet* |
 | **How much history** | Choose the days to import on the first pass (default 365) | What re-reading the last week means |
-| **Energy dashboard** | Note the statistics, then **Submit** | The exact statistic for each dashboard field, and any sources the dashboard already has |
+| **Energy dashboard** | Optionally tick **Switch the Energy dashboard to HalfPast Meter now**, then **Submit** | The statistics for each dashboard field in the editor's order, the sources the dashboard already has by name, and what the switch would change |
 
 After **Submit** the entry is created and the history starts importing in the
 background. A year of data is 13 requests per stream, 0.2 s apart, and takes a
@@ -85,9 +85,11 @@ If any of that is missing, see [troubleshooting.md](troubleshooting.md).
 
 ## Changing things later
 
-- **History depth:** the integration's **Configure** button. Raising it clears
+- **History depth:** **Configure → How much history to import**. Raising it clears
   the imported history and rebuilds it from the new depth; lowering it keeps
   what is already there.
+- **The Energy dashboard:** **Configure → Switch the Energy dashboard to
+  HalfPast Meter**, and **Restore the Energy dashboard** to undo it.
 - **A new password:** Home Assistant asks for it on its own when Bright rejects
   the old one.
 - **Sites:** remove the integration and add it again, choosing differently.

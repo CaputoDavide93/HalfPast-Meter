@@ -20,6 +20,20 @@ exact ids for your account; for a single site they are:
 A second site, or a second account, gets the same names with a short suffix;
 see [how-it-works.md](how-it-works.md#statistic-ids).
 
+## Switching it for you
+
+The setup's last page has **Switch the Energy dashboard to HalfPast Meter
+now**, and the integration's **Configure** menu has **Switch the Energy
+dashboard to HalfPast Meter** for later. Both show what will change first.
+
+- Only the **grid** and **gas** sources are replaced; solar, batteries, water
+  and devices are left exactly as they are.
+- A fuel whose stream has **no data yet** (a meter Bright is still fixing) is
+  left on its current source, so it never goes blank. Run the switch again
+  once it has data.
+- The dashboard as it was is kept: **Configure → Restore the Energy
+  dashboard** puts it back.
+
 ## Moving over from another integration
 
 If the dashboard already shows the same meters through another integration
@@ -28,10 +42,10 @@ would be counted twice. The setup's last page names every source the dashboard
 already has.
 
 1. Note what the dashboard shows today, so you can compare.
-2. In **Settings → Dashboards → Energy**, delete the existing sources for the
-   meters Bright covers.
-3. Add the `bright_meter:` statistics from the table above.
-4. Compare a past day with the Bright app: the totals should match.
+2. Use the switch above, or by hand: in **Settings → Dashboards → Energy**,
+   delete the existing sources for the meters Bright covers, then add the
+   `bright_meter:` statistics from the table above.
+3. Compare a past day with the Bright app: the totals should match.
 
 The other integration's history is not deleted by removing it from the
 dashboard; it simply stops being shown.

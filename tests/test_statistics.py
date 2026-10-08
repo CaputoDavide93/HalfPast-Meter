@@ -114,6 +114,9 @@ async def test_increasing_depth_rebuilds_the_series(
         return_value=FakeGlowmarktClient(),
     ):
         result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "history"}
+        )
         await hass.config_entries.options.async_configure(
             result["flow_id"], {CONF_BACKFILL_DAYS: 4}
         )
