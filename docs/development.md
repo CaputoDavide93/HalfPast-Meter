@@ -21,6 +21,7 @@ to a beta.
 | `custom_components/bright_meter/api.py` | The HTTP client. Knows nothing about Home Assistant |
 | `custom_components/bright_meter/coordinator.py` | The poll, the import, the sensors' snapshot |
 | `custom_components/bright_meter/statistic_ids.py` | Assigns and stores statistic ids |
+| `custom_components/bright_meter/energy_dashboard.py` | Reads, explains, switches and restores the Energy dashboard's grid and gas sources |
 | `custom_components/bright_meter/config_flow.py` | The guided setup, reauthentication, options |
 | `custom_components/bright_meter/sensor.py` | Sensors, from entity descriptions |
 | `custom_components/bright_meter/diagnostics.py` | Diagnostics without identifiers |

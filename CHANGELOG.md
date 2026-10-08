@@ -5,6 +5,25 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-08
+
+### Added
+
+- **Switch the Energy dashboard for you**, from the setup's last page or from
+  **Configure**: replaces only the grid and gas sources with HalfPast Meter's,
+  leaves a fuel without data on its current source, leaves solar, batteries,
+  water and devices alone, validates the result with Home Assistant's own
+  schema, and keeps the dashboard as it was for **Restore the Energy
+  dashboard**.
+- **Configure** is a menu: history depth, the dashboard switch, and restore.
+
+### Changed
+
+- The setup's last page lists the statistics grouped by dashboard section in
+  the editor's order (consumption before cost), marks streams with no data
+  yet, and names the sources already there by integration and field instead
+  of raw statistic ids.
+
 ## [0.3.4] - 2026-10-07
 
 ### Fixed

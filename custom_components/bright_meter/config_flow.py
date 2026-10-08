@@ -31,6 +31,7 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
+    BooleanSelector,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -41,6 +42,7 @@ from homeassistant.helpers.selector import (
 )
 from homeassistant.util import dt as dt_util
 
+from . import energy_dashboard
 from .api import (
     GlowmarktAccessDeniedError,
     GlowmarktAuthError,
@@ -60,24 +62,15 @@ from .statistic_ids import async_assign_statistic_ids
 
 _LOGGER = logging.getLogger(__name__)
 
+CONF_SWITCH_DASHBOARD = "switch_dashboard"
+CONF_CONFIRM = "confirm"
+
 STEP_USER_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_PASSWORD): str,
     }
 )
-
-# Where each stream goes in Home Assistant's Energy dashboard.
-DASHBOARD_FIELD = {
-    "electricity.consumption": "Electricity grid, *Grid consumption*",
-    "electricity.consumption.cost": (
-        "Electricity grid, *Use an entity tracking the total costs*"
-    ),
-    "electricity.export": "Electricity grid, *Return to grid*",
-    "gas.consumption": "Gas, *Gas consumption*",
-    "gas.consumption.cost": "Gas, *Use an entity tracking the total costs*",
-}
-
 
 @dataclass(frozen=True, kw_only=True)
 class _Stream:
@@ -178,60 +171,17 @@ def _meters_text(sites: list[_Site]) -> str:
     return "\n".join(lines).strip()
 
 
-def _statistics_text(sites: list[_Site], ids: dict[str, str]) -> str:
-    lines: list[str] = []
-    for site in sites:
-        if len(sites) > 1:
-            lines.append(f"**{site.name}**")
-        lines += [
-            f"- {DASHBOARD_FIELD[stream.classifier]}: `{ids[stream.resource_id]}`"
-            for stream in site.streams
-        ]
-    return "\n".join(lines)
-
-
-def _collect_statistics(node: Any, into: list[str]) -> None:
-    """Every statistic id named by a dashboard source, whatever its shape."""
-    if isinstance(node, dict):
-        for key, value in node.items():
-            if key.startswith("stat_energy_") and isinstance(value, str):
-                into.append(value)
-            else:
-                _collect_statistics(value, into)
-    elif isinstance(node, list):
-        for value in node:
-            _collect_statistics(value, into)
-
-
-async def _async_existing_sources(hass: HomeAssistant) -> list[str]:
-    """Statistics the Energy dashboard already uses that are not ours.
-
-    Read-only, and best effort: the dashboard's storage belongs to Home
-    Assistant, so anything unexpected means no warning rather than a failed
-    setup.
-    """
-    try:
-        from homeassistant.components.energy.data import async_get_manager
-
-        manager = await async_get_manager(hass)
-        sources = (manager.data or {}).get("energy_sources", [])
-    except Exception:
-        _LOGGER.debug("Could not read the Energy dashboard sources", exc_info=True)
-        return []
-    found: list[str] = []
-    _collect_statistics(sources, found)
-    return sorted({sid for sid in found if not sid.startswith(f"{DOMAIN}:")})
-
-
-def _existing_text(existing: list[str]) -> str:
-    if not existing:
-        return ""
-    named = ", ".join(f"`{sid}`" for sid in existing)
-    return (
-        f"Your Energy dashboard already uses {named}. Remove the ones that "
-        "measure these same meters before adding the statistics above, or the "
-        "energy is counted twice."
-    )
+def _dashboard_streams(
+    site: _Site, ids: dict[str, str]
+) -> list[energy_dashboard.Stream]:
+    return [
+        energy_dashboard.Stream(
+            classifier=stream.classifier,
+            statistic_id=ids[stream.resource_id],
+            has_data=stream.last_time is not None,
+        )
+        for stream in site.streams
+    ]
 
 
 async def _async_validate(hass: HomeAssistant, username: str, password: str) -> None:
@@ -357,17 +307,11 @@ class GlowmarktConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_energy(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Page 4: which statistic goes in which Energy dashboard field."""
-        if user_input is not None:
-            return self.async_create_entry(
-                title=self._credentials[CONF_USERNAME],
-                data={
-                    **self._credentials,
-                    CONF_SITES: [site.ve_id for site in self._chosen],
-                },
-                options={CONF_BACKFILL_DAYS: self._backfill_days},
-            )
+        """Page 4: which statistic goes in which Energy dashboard field.
 
+        Optionally switches the dashboard's grid and gas sources to these
+        statistics; a fuel with no data yet stays on its current source.
+        """
         # The ids the import will use. Assigning them here is what makes the
         # page exact: they are stored, so the import cannot pick different ones.
         ids = await async_assign_statistic_ids(
@@ -378,12 +322,42 @@ class GlowmarktConfigFlow(ConfigFlow, domain=DOMAIN):
                 for stream in site.streams
             ],
         )
+        if user_input is not None:
+            if user_input.get(CONF_SWITCH_DASHBOARD):
+                # The dashboard holds one grid and one gas source from here:
+                # the first chosen site's.
+                await energy_dashboard.async_switch(
+                    self.hass, _dashboard_streams(self._chosen[0], ids)
+                )
+            return self.async_create_entry(
+                title=self._credentials[CONF_USERNAME],
+                data={
+                    **self._credentials,
+                    CONF_SITES: [site.ve_id for site in self._chosen],
+                },
+                options={CONF_BACKFILL_DAYS: self._backfill_days},
+            )
+
+        statistics = []
+        for site in self._chosen:
+            text = energy_dashboard.statistics_text(_dashboard_streams(site, ids))
+            statistics.append(
+                f"*{site.name}*\n\n{text}" if len(self._chosen) > 1 else text
+            )
+        sources = await energy_dashboard.async_current_sources(self.hass)
         return self.async_show_form(
             step_id="energy",
-            data_schema=vol.Schema({}),
+            data_schema=vol.Schema(
+                {vol.Optional(CONF_SWITCH_DASHBOARD, default=False): BooleanSelector()}
+            ),
             description_placeholders={
-                "statistics": _statistics_text(self._chosen, ids),
-                "existing": _existing_text(await _async_existing_sources(self.hass)),
+                "statistics": "\n\n".join(statistics),
+                "existing": await energy_dashboard.async_existing_text(
+                    self.hass, sources
+                ),
+                "plan": energy_dashboard.plan_text(
+                    _dashboard_streams(self._chosen[0], ids)
+                ),
             },
         )
 
@@ -434,12 +408,21 @@ class GlowmarktConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class GlowmarktOptionsFlow(OptionsFlowWithReload):
-    """Lets the history depth be changed after setup; saving reloads the entry."""
+    """History depth, and the Energy dashboard switch, from Configure."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Manage the options."""
+        """A menu: history, switch the dashboard, or put it back."""
+        options = ["history", "energy_dashboard"]
+        if await energy_dashboard.async_has_backup(self.hass):
+            options.append("restore_dashboard")
+        return self.async_show_menu(step_id="init", menu_options=options)
+
+    async def async_step_history(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """How many days of history to import; saving reloads the entry."""
         if user_input is not None:
             return self.async_create_entry(
                 data={CONF_BACKFILL_DAYS: int(user_input[CONF_BACKFILL_DAYS])}
@@ -457,4 +440,65 @@ class GlowmarktOptionsFlow(OptionsFlowWithReload):
                 )
             }
         )
-        return self.async_show_form(step_id="init", data_schema=schema)
+        return self.async_show_form(step_id="history", data_schema=schema)
+
+    def _streams(self) -> list[energy_dashboard.Stream]:
+        """This entry's first site's streams, and whether each has data yet."""
+        coordinator = self.config_entry.runtime_data
+        resources = coordinator.resources
+        if not resources:
+            return []
+        first_site = resources[0].ve_id
+        data = coordinator.data
+        return [
+            energy_dashboard.Stream(
+                classifier=r.classifier,
+                statistic_id=r.statistic_id,
+                has_data=bool(data and data.data_until.get(r.resource_id)),
+            )
+            for r in resources
+            if r.ve_id == first_site
+        ]
+
+    async def async_step_energy_dashboard(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Say exactly what would change, then switch on confirmation."""
+        streams = self._streams()
+        if user_input is not None:
+            if not user_input.get(CONF_CONFIRM):
+                return self.async_abort(reason="dashboard_unchanged")
+            switched = await energy_dashboard.async_switch(self.hass, streams)
+            if not switched:
+                return self.async_abort(reason="dashboard_nothing_to_switch")
+            return self.async_abort(
+                reason="dashboard_switched",
+                description_placeholders={"fuels": " and ".join(switched)},
+            )
+
+        sources = await energy_dashboard.async_current_sources(self.hass)
+        return self.async_show_form(
+            step_id="energy_dashboard",
+            data_schema=vol.Schema(
+                {vol.Required(CONF_CONFIRM, default=False): BooleanSelector()}
+            ),
+            description_placeholders={
+                "plan": energy_dashboard.plan_text(streams),
+                "existing": await energy_dashboard.async_existing_text(
+                    self.hass, sources
+                ),
+            },
+        )
+
+    async def async_step_restore_dashboard(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Put the dashboard back as it was before the last switch."""
+        if user_input is not None:
+            restored = await energy_dashboard.async_restore(self.hass)
+            return self.async_abort(
+                reason="dashboard_restored" if restored else "dashboard_no_backup"
+            )
+        return self.async_show_form(
+            step_id="restore_dashboard", data_schema=vol.Schema({})
+        )

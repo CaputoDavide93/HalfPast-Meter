@@ -22,6 +22,7 @@
 | 📈 | Energy dashboard history | Imports electricity, gas and their cost as hourly external statistics, each hour placed where it happened, however late the reading lands |
 | 🕳️ | Gaps stay gaps | Asks Glowmarkt to mark uncollected half-hours (`nulls=1`) and stops at its newest reading (`last-time`): a missing hour gets no row, and a real zero is imported at once. An hour stored earlier that later comes back missing is kept flat (zero that hour) rather than deleted |
 | 🔁 | Late data repaired | Re-reads the last week on every pass. Every chunk is read and checked before anything is written, then the rewrite goes in as one batch, so revised readings replace what was stored and the running total does not step backwards |
+| 🔀 | Energy dashboard switch | One tick replaces only the grid and gas sources with HalfPast Meter's, leaves a fuel without data where it is, and keeps the old setup for a one-click restore |
 | 🗓️ | Last full day | Yesterday's total once every hour of it is in, built from local midnights so the 23- and 25-hour clock-change days come out right |
 | 🏷️ | Meter tariff | The unit rate and standing charge the meter itself holds, per fuel, so you can see whether a new supplier's rates have reached it |
 | 🪪 | Stable statistic ids | Each meter stream keeps the id it was first given, so adding a site or a second account never renames, or writes into, an existing history |
@@ -86,7 +87,7 @@ The guided setup asks for the Bright **email** and **password**, shows the meter
 
 | Option | Default | What it does |
 |---|---|---|
-| Days of history to import | 365 (1 to 3650) | How far back the first import reaches. Raising it clears the imported history and rebuilds it from the new depth; lowering it keeps what is already imported |
+| How much history to import | 365 days (1 to 3650) | How far back the first import reaches. Raising it clears the imported history and rebuilds it from the new depth; lowering it keeps what is already imported |
 
 ---
 

@@ -45,7 +45,13 @@
       },
       "energy": {
         "title": "Energy dashboard",
-        "description": "After setup, open **Settings, Dashboards, Energy** and choose these statistics, each in the field named:\n\n{statistics}\n\n{existing}\n\nSelect **Submit** to finish setup. History starts importing in the background straight away."
+        "description": "These are the statistics for **Settings → Dashboards → Energy**, in the order its editor asks for them:\n\n{statistics}\n\n{existing}\n\n**Switch it for me** does the dashboard now:\n{plan}\n\nThe dashboard as it was is kept, and **Configure → Restore the Energy dashboard** puts it back. History starts importing in the background as soon as you select **Submit**.",
+        "data": {
+          "switch_dashboard": "Switch the Energy dashboard to HalfPast Meter now"
+        },
+        "data_description": {
+          "switch_dashboard": "Leave it off to check the data first; you can switch later from the integration's Configure button."
+        }
       }
     },
     "error": {
@@ -64,7 +70,15 @@
   "options": {
     "step": {
       "init": {
-        "title": "Bright options",
+        "title": "HalfPast Meter",
+        "menu_options": {
+          "history": "How much history to import",
+          "energy_dashboard": "Switch the Energy dashboard to HalfPast Meter",
+          "restore_dashboard": "Restore the Energy dashboard as it was"
+        }
+      },
+      "history": {
+        "title": "How much history",
         "description": "How many days of history to import. The last week is re-read on every pass, because readings arrive late.",
         "data": {
           "backfill_days": "Days of history to import"
@@ -72,7 +86,28 @@
         "data_description": {
           "backfill_days": "Raising it clears the imported history and rebuilds it from the new depth. Lowering it keeps what is already imported."
         }
+      },
+      "energy_dashboard": {
+        "title": "Switch the Energy dashboard",
+        "description": "This is what will change:\n{plan}\n\n{existing}\n\nThe dashboard as it is now is kept, so **Restore the Energy dashboard** can put it back.",
+        "data": {
+          "confirm": "Yes, switch it"
+        },
+        "data_description": {
+          "confirm": "Nothing changes unless this is ticked."
+        }
+      },
+      "restore_dashboard": {
+        "title": "Restore the Energy dashboard",
+        "description": "Puts the dashboard's sources back exactly as they were before the last switch. Select **Submit** to restore."
       }
+    },
+    "abort": {
+      "dashboard_switched": "Done: the Energy dashboard's {fuels} now comes from HalfPast Meter. Configure → Restore the Energy dashboard puts it back.",
+      "dashboard_unchanged": "Nothing changed.",
+      "dashboard_nothing_to_switch": "Nothing to switch yet: HalfPast Meter has no data for electricity or gas so far. Try again once the data until sensors show a time.",
+      "dashboard_restored": "The Energy dashboard is back as it was.",
+      "dashboard_no_backup": "There is no earlier dashboard to restore."
     }
   },
   "entity": {

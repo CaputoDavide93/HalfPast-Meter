@@ -203,8 +203,10 @@ async def test_the_dashboard_page_warns_about_sources_already_there(
     energy, _ = await _finish(hass, meters, client)
 
     existing = energy["description_placeholders"]["existing"]
-    assert "octopus_energy:electricity_import" in existing
-    assert "octopus_energy:gas_import" in existing
+    # Named by where they come from and what they are, not by raw id.
+    assert "octopus_energy" in existing
+    assert "grid consumption" in existing and "gas" in existing
+    assert "octopus_energy:electricity_import" not in existing
     entry = hass.config_entries.async_entries(DOMAIN)[0]
     await _settle(hass, entry)
 

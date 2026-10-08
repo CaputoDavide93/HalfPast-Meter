@@ -92,6 +92,9 @@ async def test_an_anchor_beyond_30_days_is_still_found(
 
     with patch(CLIENT, return_value=client):
         result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "history"}
+        )
         await hass.config_entries.options.async_configure(
             result["flow_id"], {CONF_BACKFILL_DAYS: 7}
         )
@@ -143,6 +146,9 @@ async def test_a_failed_chunk_leaves_the_stored_series_untouched(
 
     with patch(CLIENT, return_value=client):
         result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "history"}
+        )
         client.readings_calls.clear()
         # The rebuild reads electricity in two chunks; fail the second.
         client.fail_readings_call = 2
