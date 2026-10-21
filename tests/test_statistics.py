@@ -10,6 +10,7 @@ from datetime import timedelta
 from itertools import pairwise
 from unittest.mock import patch
 
+import pytest
 from homeassistant.components.recorder.statistics import statistics_during_period
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
@@ -20,7 +21,7 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
 
 from custom_components.bright_meter.const import CONF_BACKFILL_DAYS, DOMAIN
 
-from .const import HOURLY_ENERGY, FakeGlowmarktClient
+from .const import HOURLY_ENERGY, RESOURCES_DUAL_FUEL, FakeGlowmarktClient
 
 STAT_ID = f"{DOMAIN}:electricity_consumption"
 
@@ -131,6 +132,96 @@ async def test_increasing_depth_rebuilds_the_series(
     # Rebuilt from scratch, so the running sum restarts rather than continuing
     # on from the shallow series.
     assert deep[0]["sum"] == HOURLY_ENERGY
+
+
+@pytest.mark.parametrize(
+    "fail_readings_call",
+    [None, 1, 2],
+    ids=["rebuild", "read-failure", "later-read-failure"],
+)
+async def test_increasing_depth_after_time_passes_preserves_accumulated_history(
+    bright_env, hass: HomeAssistant, fail_readings_call: int | None
+) -> None:
+    """A deeper rolling window must not erase history accumulated before it.
+
+    A failed rebuild must leave every old row and its cumulative sum untouched;
+    a successful one may rebuild or retain them, but must keep the same id and
+    carry the total consistently across the old and new hours.
+    """
+    current_hour = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+    initial_hour = current_hour - timedelta(days=60)
+    client = FakeGlowmarktClient(
+        resources=RESOURCES_DUAL_FUEL[:1], zero_from=initial_hour
+    )
+    with patch(
+        "custom_components.bright_meter.coordinator.dt_util.utcnow",
+        return_value=initial_hour,
+    ) as clock:
+        entry = await _setup_with(hass, client, days=1)
+        initial = await _rows(hass)
+        assert initial
+        statistic_ids = {
+            resource.resource_id: resource.statistic_id
+            for resource in entry.runtime_data.resources
+        }
+        assert set(statistic_ids.values()) == {STAT_ID}
+
+        clock.return_value = current_hour
+        client.zero_from = current_hour
+        await entry.runtime_data.async_backfill()
+        await _settle(hass, entry)
+
+        before = await _rows(hass)
+        before_by_hour = {row["start"]: row for row in before}
+        assert len(before) > len(initial)
+        assert all(before_by_hour[row["start"]] == row for row in initial)
+        assert dt_util.utc_from_timestamp(before[0]["start"]) < (
+            current_hour - timedelta(days=4)
+        )
+
+        replacement = FakeGlowmarktClient(
+            resources=RESOURCES_DUAL_FUEL[:1], zero_from=current_hour
+        )
+        replacement.fail_readings_call = fail_readings_call
+        with patch(
+            "custom_components.bright_meter.GlowmarktClient",
+            return_value=replacement,
+        ):
+            result = await hass.config_entries.options.async_init(entry.entry_id)
+            result = await hass.config_entries.options.async_configure(
+                result["flow_id"], {"next_step_id": "history"}
+            )
+            await hass.config_entries.options.async_configure(
+                result["flow_id"], {CONF_BACKFILL_DAYS: 4}
+            )
+            await hass.async_block_till_done()
+            await _settle(hass, entry)
+
+        assert {
+            resource.resource_id: resource.statistic_id
+            for resource in entry.runtime_data.resources
+        } == statistic_ids
+        assert replacement.readings_calls
+        after = await _rows(hass)
+        if fail_readings_call is not None:
+            assert after == before
+            assert entry.runtime_data._depth_applied[STAT_ID] == 1
+        else:
+            after_by_hour = {row["start"]: row for row in after}
+            assert before_by_hour.keys() <= after_by_hour.keys(), (
+                "increasing depth erased previously imported hours"
+            )
+            assert all(after_by_hour[row["start"]] == row for row in initial)
+            assert all(
+                after_by_hour[row["start"]]["state"] == row["state"]
+                for row in before
+            )
+            assert len(after) > len(before)
+            assert after[-1]["sum"] > before[-1]["sum"]
+            assert [row["sum"] for row in after] == [
+                count * HOURLY_ENERGY for count in range(1, len(after) + 1)
+            ]
+            assert entry.runtime_data._depth_applied[STAT_ID] == 4
 
 
 async def test_second_pass_does_not_duplicate(
