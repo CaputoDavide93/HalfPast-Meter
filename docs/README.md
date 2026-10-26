@@ -3,6 +3,7 @@
 | Guide | Read it when |
 |---|---|
 | [setup.md](setup.md) | You are installing: the Bright app, the install, the four setup pages, checking it worked |
+| [faq.md](faq.md) | You want a short answer: suppliers, live power, why it is private |
 | [energy-dashboard.md](energy-dashboard.md) | You are wiring the Energy dashboard, or moving over from another integration |
 | [entities.md](entities.md) | You want every statistic and sensor, generated from the code |
 | [how-it-works.md](how-it-works.md) | You want to know what happens every 30 minutes, and why the history stays right |
