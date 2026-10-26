@@ -15,6 +15,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The repository is renamed to `HalfPast-Meter-Home-Assistant`. GitHub
+  redirects the old URL; a HACS custom repository added under the old URL
+  should be removed and added again under the new one. The domain
+  `bright_meter` and every statistic id are unchanged.
 - CI runs HACS's full validation (its `hacsjson` and `integration_manifest`
   checks were skipped while the repository was private), and runs Hassfest,
   HACS and the tests every week as well as on each push.

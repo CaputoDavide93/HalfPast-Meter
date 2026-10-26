@@ -30,11 +30,11 @@ days).
 
 **With HACS** (recommended):
 
-[![Open your Home Assistant instance and add this repository to HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=CaputoDavide93&repository=HalfPast-Meter&category=integration)
+[![Open your Home Assistant instance and add this repository to HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=CaputoDavide93&repository=HalfPast-Meter-Home-Assistant&category=integration)
 
 The button opens HACS on your own Home Assistant with this repository filled
 in. Without it: **HACS → ⋮ → Custom repositories**, add
-`https://github.com/CaputoDavide93/HalfPast-Meter` with the type
+`https://github.com/CaputoDavide93/HalfPast-Meter-Home-Assistant` with the type
 **Integration**. Then download **HalfPast Meter** and restart Home Assistant.
 HACS offers each GitHub release, and notifies you of new ones.
 
