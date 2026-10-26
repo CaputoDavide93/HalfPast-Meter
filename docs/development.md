@@ -10,6 +10,11 @@ make check    # what CI runs: ruff, pytest, diagrams and generated tables curren
 make hassfest # Home Assistant's own validation, the other CI job (needs Docker)
 ```
 
+CI runs the tests, Hassfest and HACS's action on every push and pull request,
+and again every Monday. A second test job runs the same suite on the newest
+Home Assistant release (`.github/ha-latest/requirements.txt`), so a breaking
+release shows up before users install it.
+
 `requirements_test.txt` pins `pytest-homeassistant-custom-component`, which pins
 exactly one Home Assistant release. Move it with the Home Assistant you run, not
 to a beta.
@@ -29,6 +34,8 @@ to a beta.
 | `tests/const.py` | `FakeGlowmarktClient`: the API, including its misbehaviour |
 | `tools/gen_diagram.py` | The diagrams in `docs/assets/` |
 | `tools/gen_docs.py` | The statistics and sensor tables in the README and `entities.md` |
+| `tools/gen_social_preview.py` | GitHub's social preview card, `docs/assets/social-preview.png` (`make social`) |
+| `.github/ha-latest/requirements.txt` | The newest Home Assistant, for CI's canary job; dependabot bumps it |
 | `tests/test_hacs.py` | HACS's own `hacs.json` and manifest schemas, structure and brand icon |
 
 ## Rules
@@ -54,15 +61,18 @@ to a beta.
 
 ## Going public
 
-When it has run well on a live account for a few weeks:
+Public since 26 October 2026; kept as the record of what changed.
 
-- [ ] Make the repository public.
-- [ ] Remove the `ignore:` line from `.github/workflows/validate.yaml`: HACS's
-      action can then read `hacs.json` and the manifest itself (until then,
-      `tests/test_hacs.py` checks them against HACS's own schemas).
-- [ ] Add scheduled CI: weekly Hassfest and HACS validation, and a latest-HA
+- [x] Make the repository public.
+- [x] Remove the `ignore:` line from `.github/workflows/validate.yaml`: HACS's
+      action now reads `hacs.json` and the manifest itself
+      (`tests/test_hacs.py` still checks them against HACS's own schemas).
+- [x] Add scheduled CI: weekly Hassfest and HACS validation, and a latest-HA
       canary.
-- [ ] In the README and `docs/setup.md`, make HACS the first install route and
+- [x] In the README and `docs/setup.md`, make HACS the first install route and
       drop "once this repository is public"; add the my.home-assistant HACS
       button.
-- [ ] Check every doc for anything private: hostnames, account details.
+- [x] Check every doc for anything private: hostnames, account details.
+- [x] Add a social preview, `docs/assets/social-preview.png`
+      (`make social`).
+- [ ] Upload it in **Settings, Social preview**: GitHub has no API for it.

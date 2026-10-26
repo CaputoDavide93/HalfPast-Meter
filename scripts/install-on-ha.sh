@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install the committed bright_meter onto a Home Assistant host over SSH.
 #
-# For while the repository is private and HACS cannot install it. Ships HEAD
+# For development copies; users install through HACS. Ships HEAD
 # only (git archive), never the working tree, so what runs is what is
 # committed. The new copy is unpacked beside the old one and swapped in, so a
 # failed transfer leaves the installed version untouched.

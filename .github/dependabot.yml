@@ -13,3 +13,11 @@ updates:
       interval: weekly
     labels:
       - dependencies
+
+  # The latest-Home-Assistant canary in tests.yaml.
+  - package-ecosystem: pip
+    directory: /.github/ha-latest
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies

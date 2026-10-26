@@ -1,7 +1,7 @@
 # One entry point for the checks CI runs. `make check` before every push.
 PYTHON := .venv/bin/python
 
-.PHONY: venv test lint diagram check hassfest install
+.PHONY: venv test lint diagram social check hassfest install
 
 venv: ## Home Assistant 2026.9.4 test environment, built with uv
 	uv venv -q --allow-existing --python 3.14 .venv
@@ -16,6 +16,9 @@ lint: ## ruff
 diagram: ## Redraw docs/assets/architecture-*.svg and the README tables
 	python3 tools/gen_diagram.py
 	python3 tools/gen_docs.py
+
+social: ## Redraw docs/assets/social-preview.png (upload it in the repository settings)
+	$(PYTHON) tools/gen_social_preview.py
 
 check: lint test ## Everything CI checks
 	python3 tools/gen_diagram.py --check

@@ -1,11 +1,10 @@
 """The repository is installable by HACS.
 
-HACS's own action cannot read a private repository's files (it fetches them
-anonymously, and gets a 404), so while this repository is private its
-`hacsjson` and `integration_manifest` checks are skipped in CI. These tests
-make the same checks locally instead, with the schemas copied from HACS's
-source (hacs/integration, custom_components/hacs/utils/validate.py, MIT), so
-going public is a visibility switch, not a repair job.
+HACS's own action runs in CI (validate.yaml). These tests make its
+`hacsjson` and `integration_manifest` checks locally too, with the schemas
+copied from HACS's source (hacs/integration,
+custom_components/hacs/utils/validate.py, MIT), so `make check` catches a
+broken manifest before a push does.
 """
 
 from __future__ import annotations
