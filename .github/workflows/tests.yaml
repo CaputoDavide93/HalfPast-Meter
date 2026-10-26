@@ -1,12 +1,12 @@
 name: Tests
 
-# Push and pull request only while the repository is private: scheduled runs
-# would spend Actions minutes on an account that has run out of them before.
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"   # weekly: Home Assistant moves under us
   workflow_dispatch:
 
 permissions:
@@ -37,6 +37,27 @@ jobs:
         run: |
           python tools/gen_diagram.py --check
           python tools/gen_docs.py --check
+
+      - name: pytest
+        run: pytest -q
+
+  latest-home-assistant:
+    # The canary: the same suite on the newest Home Assistant release, so a
+    # breaking change shows here before users install that release.
+    name: Tests on the latest Home Assistant
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: .github/ha-latest/requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r .github/ha-latest/requirements.txt
 
       - name: pytest
         run: pytest -q

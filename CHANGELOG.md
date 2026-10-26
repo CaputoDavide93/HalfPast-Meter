@@ -5,6 +5,22 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Install with HACS.** The repository is public, so HACS is now the first
+  install route, with a my.home-assistant button that adds the repository in
+  one click. `scripts/install-on-ha.sh` stays for development copies.
+- A social preview card, `docs/assets/social-preview.png`, drawn by
+  `tools/gen_social_preview.py` (`make social`).
+
+### Changed
+
+- CI runs HACS's full validation (its `hacsjson` and `integration_manifest`
+  checks were skipped while the repository was private), and runs Hassfest,
+  HACS and the tests every week as well as on each push.
+- A canary job runs the test suite on the newest Home Assistant release
+  (`.github/ha-latest/requirements.txt`, bumped weekly by dependabot).
+
 ## [0.4.2] - 2026-10-08
 
 ### Fixed

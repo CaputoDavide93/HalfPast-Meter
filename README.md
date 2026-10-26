@@ -11,20 +11,17 @@
 
 ![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![Home Assistant](https://img.shields.io/badge/Home_Assistant-2026.9-41BDF5?logo=homeassistant&logoColor=white)
+[![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5)](https://hacs.xyz)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Visibility](https://img.shields.io/badge/Repository-private-lightgrey)
 [![Tests](https://github.com/CaputoDavide93/HalfPast-Meter/actions/workflows/tests.yaml/badge.svg)](https://github.com/CaputoDavide93/HalfPast-Meter/actions/workflows/tests.yaml)
 
 </div>
 
 ---
 
-> **Private on purpose.** HalfPast Meter has run against one live Bright account, but
-> several behaviours are still unproven (see [what is tested](#-tested-and-unverified)).
-> Until they are, the repository stays private, so HACS cannot install it and
-> `scripts/install-on-ha.sh` ships it instead. The README, diagrams and docs use demo
-> data only, so the repository can go public without a rewrite; the steps are in
-> [docs/development.md](docs/development.md#going-public).
+> **Early days.** HalfPast Meter runs on a live Bright account, but a few behaviours are
+> still unverified; [what is tested](#-tested-and-unverified) lists them. Reports from other
+> accounts, especially gas-only, export or several sites, are welcome.
 
 ## 💡 Why it exists
 
@@ -45,7 +42,7 @@ supplier.
 | History on first setup | Up to a year (1 to 3650 days) | Usually none | Whatever you type |
 | Cost and tariff | Cost statistics, plus unit rate and standing charge from the meter | Depends on the integration | Your own sums |
 | Live power | No | Only with a local device | No |
-| Works while the repository is private | Yes, installed over SSH | Yes | Yes |
+| Installs with HACS | Yes, as a custom repository | Depends on the integration | Not needed |
 
 The trade-off: nothing here is live. The feed is half-hourly and arrives late.
 
@@ -53,19 +50,19 @@ The trade-off: nothing here is live. The feed is half-hourly and arrives late.
 
 ## 🚀 Install in 3 steps
 
-You need Home Assistant 2026.9 or newer, a Bright account that already shows your usage
-(iOS or Android app, free), and SSH to your Home Assistant host (the SSH add-on, key login).
+You need Home Assistant 2026.9 or newer, [HACS](https://hacs.xyz), and a Bright account
+that already shows your usage (iOS or Android app, free).
 
-1. **Clone and point the script at your host.**
+[![Open your Home Assistant instance and add this repository to HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=CaputoDavide93&repository=HalfPast-Meter&category=integration)
 
-   ```bash
-   git clone https://github.com/CaputoDavide93/HalfPast-Meter && cd HalfPast-Meter
-   cp .env.example .env        # set HA_SSH_TARGET to your host's SSH login
-   ```
-
-2. **Ship it.** `scripts/install-on-ha.sh --restart` copies the committed component and runs
-   `ha core restart`. (Or copy `custom_components/bright_meter/` into `config/custom_components/` and restart.)
+1. **Add the repository to HACS.** Use the button above, or in HACS open **⋮, Custom
+   repositories**, add `https://github.com/CaputoDavide93/HalfPast-Meter` with the type
+   **Integration**.
+2. **Install it.** Download **HalfPast Meter** in HACS, then restart Home Assistant.
 3. **Add it.** **Settings, Devices and services, Add integration, HalfPast Meter.** Four pages: sign in, your meters, how much history, the statistics to pick for the Energy dashboard.
+
+Without HACS, copy `custom_components/bright_meter/` into `config/custom_components/` and
+restart, or use `scripts/install-on-ha.sh` from a clone (see [Deployment](#-deployment)).
 
 If another integration already feeds the same meters, remove it from the dashboard first, or
 the energy is counted twice. Details and checks: [docs/setup.md](docs/setup.md).
@@ -112,7 +109,8 @@ Every 30 minutes the integration asks Glowmarkt how far each stream's data reach
 |---|---|
 | Statistics import, gaps, late data, clock-change days, tariff fallback, reauth, diagnostics | Tested: pytest suite against a real recorder, Home Assistant 2026.9.4, Python 3.14 |
 | Sign-in, streams and import on a live Bright account | Run on one account; no wider coverage |
-| Home Assistant HACS and Hassfest validation | Hassfest runs in CI; the HACS action runs only once the repository is public (it cannot validate a private one) |
+| Home Assistant HACS and Hassfest validation | Both run in CI on every push and pull request, and weekly |
+| The newest Home Assistant release | The suite runs against it in CI too, as a canary, and weekly |
 | DCC catch-up request limit of two hours | Unverified: published folklore, the integration keeps to it |
 | Which half-hour carries the standing charge in the cost stream | Unverified |
 | The tariff payload's real shape | Unverified: both documented shapes are parsed |
@@ -127,12 +125,12 @@ Every 30 minutes the integration asks Glowmarkt how far each stream's data reach
 |---|---|
 | [Setup](docs/setup.md) | The Bright app, installing, the four setup pages, checking it worked |
 | [Energy dashboard](docs/energy-dashboard.md) | Which statistic goes where, and moving over from another integration |
-| [FAQ](docs/faq.md) | Short answers: suppliers, live power, privacy, why it is private |
+| [FAQ](docs/faq.md) | Short answers: suppliers, live power, privacy, installing |
 | [Statistics and sensors](docs/entities.md) | Every statistic and sensor, generated from the code |
 | [How it works](docs/how-it-works.md) | One 30-minute pass, and the rules that keep the history right |
 | [Troubleshooting](docs/troubleshooting.md) | Symptoms first, then diagnostics and debug logging |
 | [Glowmarkt API](docs/glowmarkt-api.md) | The calls, units and quirks, what is unverified, and the prior art |
-| [Development](docs/development.md) | Checks, layout, rules, releases, going public |
+| [Development](docs/development.md) | Checks, layout, rules, releases |
 
 ---
 
@@ -222,12 +220,13 @@ HalfPast-Meter/
 │   └── install-on-ha.sh     # 📦 ship the committed component to an HA host over SSH
 ├── tools/
 │   ├── gen_diagram.py       # 🗺️ draws the diagrams in docs/assets/
-│   └── gen_docs.py          # 🤖 the statistics and sensor tables (README, docs/entities.md)
+│   ├── gen_docs.py          # 🤖 the statistics and sensor tables (README, docs/entities.md)
+│   └── gen_social_preview.py # 🖼️ draws docs/assets/social-preview.png
 ├── docs/                    # 📚 setup, FAQ, energy dashboard, entities, how it works, API, development
-│   └── assets/              # 🖼️ banner and diagrams, light and dark
-├── .github/                 # 🤖 tests, Hassfest and HACS workflows, dependabot
+│   └── assets/              # 🖼️ banner, social preview, and diagrams light and dark
+├── .github/                 # 🤖 tests (and the latest-HA canary), Hassfest and HACS workflows, dependabot
 ├── llms.txt                 # 🤖 the project in one plain-text page
-├── Makefile                 # 🔧 venv, check, test, lint, diagram, install
+├── Makefile                 # 🔧 venv, check, test, lint, diagram, social, install
 ├── .env.example             # ⚙️ the install script's SSH target
 ├── hacs.json  pyproject.toml  pytest.ini  requirements_test.txt
 └── AGENTS.md  CLAUDE.md  CHANGELOG.md  LICENSE  SECURITY.md
@@ -248,7 +247,7 @@ The tests run against a real recorder: the statistics import, gaps and late data
 
 ## 📦 Deployment
 
-`scripts/install-on-ha.sh` ships `HEAD`, never the working tree, and refuses if the component has uncommitted changes. It unpacks beside the installed copy and swaps it in, so a failed transfer leaves the old version running. Pass `--restart` to run `ha core restart` afterwards.
+HACS installs each GitHub release. For a development copy, `scripts/install-on-ha.sh` ships `HEAD` over SSH, never the working tree, and refuses if the component has uncommitted changes. It unpacks beside the installed copy and swaps it in, so a failed transfer leaves the old version running. Pass `--restart` to run `ha core restart` afterwards.
 
 ---
 

@@ -46,11 +46,10 @@ v0.1.2 under MIT; keep both copyright lines in `LICENSE` and the upstream
 - **The domain `bright_meter` and the `bright_meter:` statistic ids are runtime
   identifiers.** Renaming either orphans every imported statistic on every
   install.
-- **Private for now**, so HACS cannot install it: `scripts/install-on-ha.sh`
-  ships the committed component over SSH. It goes public once proven on a live
-  account; then follow "Going public" in `docs/development.md` (the HACS
-  workflow's `ignore:` line must go). The repo is otherwise HACS-ready, pinned
-  by `tests/test_hacs.py`. Brand images are in
+- **Public since 26 Oct 2026**, installed through HACS as a custom repository
+  from GitHub releases; `scripts/install-on-ha.sh` still ships the committed
+  component over SSH for development. HACS's action validates every push and
+  weekly; `tests/test_hacs.py` makes the same schema checks locally. Brand images are in
   `custom_components/bright_meter/brand/` (light and dark).
 - **Rules the importer keeps, each pinned by a test:** readings are requested
   with `nulls=1` and malformed answers raise; nothing at or after `last-time`
@@ -65,3 +64,8 @@ v0.1.2 under MIT; keep both copyright lines in `LICENSE` and the upstream
   cost stream, the tariff payload's real shape, and gas in m³.
 - Checks: `make venv` once, then `make check` (ruff, pytest against HA
   2026.9.4, diagrams current). Bump `requirements_test.txt` with the house's HA.
+  CI also runs the suite on the newest HA (`.github/ha-latest/requirements.txt`,
+  bumped by dependabot) and, weekly, every workflow.
+- The social preview is `docs/assets/social-preview.png`, drawn by
+  `tools/gen_social_preview.py` (`make social`) and uploaded by hand in the
+  repository's settings.

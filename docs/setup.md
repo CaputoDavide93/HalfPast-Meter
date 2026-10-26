@@ -28,13 +28,17 @@ days).
 
 ## 2. Install the integration
 
-**With HACS**, once the repository is public (HACS installs only public
-repositories): **HACS → ⋮ → Custom repositories**, add
-`https://github.com/CaputoDavide93/HalfPast-Meter` with the category
-**Integration**, install **HalfPast Meter**, then restart Home Assistant.
+**With HACS** (recommended):
+
+[![Open your Home Assistant instance and add this repository to HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=CaputoDavide93&repository=HalfPast-Meter&category=integration)
+
+The button opens HACS on your own Home Assistant with this repository filled
+in. Without it: **HACS → ⋮ → Custom repositories**, add
+`https://github.com/CaputoDavide93/HalfPast-Meter` with the type
+**Integration**. Then download **HalfPast Meter** and restart Home Assistant.
 HACS offers each GitHub release, and notifies you of new ones.
 
-**While the repository is private**, install it one of these two ways.
+**Without HACS**, install it one of these two ways.
 
 **From a clone, over SSH** (needs the SSH add-on, with your public key):
 

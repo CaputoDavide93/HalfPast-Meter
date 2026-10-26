@@ -26,18 +26,20 @@ your usage. A new account can take a day or two before the meter's data arrives.
 No. The feed is half-hourly and reaches Glowmarkt 30 minutes to two days late. Live power
 needs a Glow display or CAD on local MQTT, which this integration does not read.
 
-## Why is the repository private?
+## How do I install it?
 
-It has not been proven well enough on a live Bright account yet. The catch-up rate limit,
-the standing-charge half-hour, the tariff payload shape and gas in m³ are unverified (the
-list is in the [README](../README.md#-tested-and-unverified)). It goes public after it has
-run well for a few weeks; the checklist is in [development.md](development.md#going-public).
+With HACS: add this repository as a custom repository of type **Integration**, download
+**HalfPast Meter** and restart Home Assistant; [setup.md](setup.md#2-install-the-integration)
+has a button that does the first step. Without HACS, copy
+`custom_components/bright_meter/` into Home Assistant's `config/custom_components/` and
+restart.
 
-## How do I install it while it is private?
+## Is everything proven?
 
-Run `scripts/install-on-ha.sh --restart` from a clone, with `HA_SSH_TARGET` set in `.env`,
-or copy `custom_components/bright_meter/` into Home Assistant's `config/custom_components/`
-and restart. HACS cannot install a private repository.
+Not yet. It runs on a live Bright account, but the catch-up rate limit, the
+standing-charge half-hour, the tariff payload shape and gas in m³ are unverified (the
+list is in the [README](../README.md#-tested-and-unverified)). A report from an account
+unlike that one helps most.
 
 ## Where do the credentials go?
 
