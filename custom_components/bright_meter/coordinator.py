@@ -650,8 +650,13 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
         history_start = current_hour - timedelta(days=requested_days)
 
         if rebuild:
+            stored = set(
+                await self._async_hours_with_statistics(
+                    statistic_id, dt_util.utc_from_timestamp(0), current_hour
+                )
+            )
             anchor_sum = 0.0
-            cursor = history_start
+            cursor = min(history_start, min(stored, default=history_start))
         else:
             last_stats = await get_instance(self.hass).async_add_executor_job(
                 get_last_statistics, self.hass, 1, statistic_id, True, {"sum"}
@@ -711,15 +716,12 @@ class GlowmarktCoordinator(DataUpdateCoordinator[BrightData]):
         }
 
         # Every read is done; work out the whole rewrite before touching it.
-        stored = (
-            set()
-            if rebuild
-            else set(
+        if not rebuild:
+            stored = set(
                 await self._async_hours_with_statistics(
                     statistic_id, cursor, current_hour
                 )
             )
-        )
         if self.hass.is_stopping:
             return
 
