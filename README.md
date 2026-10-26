@@ -229,7 +229,7 @@ HalfPast-Meter-Home-Assistant/
 ├── Makefile                 # 🔧 venv, check, test, lint, diagram, social, install
 ├── .env.example             # ⚙️ the install script's SSH target
 ├── hacs.json  pyproject.toml  pytest.ini  requirements_test.txt
-└── AGENTS.md  CLAUDE.md  CHANGELOG.md  LICENSE  SECURITY.md
+└── AGENTS.md  CHANGELOG.md  LICENSE  SECURITY.md
 ```
 
 ---
