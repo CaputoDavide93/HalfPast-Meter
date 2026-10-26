@@ -107,7 +107,7 @@ Every 30 minutes the integration asks Glowmarkt how far each stream's data reach
 |---|---|
 | Statistics import, gaps, late data, clock-change days, tariff fallback, reauth, diagnostics | Tested: pytest suite against a real recorder, Home Assistant 2026.9.4, Python 3.14 |
 | Sign-in, streams and import on a live Bright account | Run on one account; no wider coverage |
-| Home Assistant HACS and Hassfest validation | Run in CI (the HACS action is told to ignore the repository while it is private) |
+| Home Assistant HACS and Hassfest validation | Hassfest runs in CI; the HACS action runs only once the repository is public (it cannot validate a private one) |
 | DCC catch-up request limit of two hours | Unverified: published folklore, the integration keeps to it |
 | Which half-hour carries the standing charge in the cost stream | Unverified |
 | The tariff payload's real shape | Unverified: both documented shapes are parsed |
