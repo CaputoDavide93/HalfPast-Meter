@@ -4,14 +4,68 @@
 
 # 📊 HalfPast Meter
 
-**Your smart meter's half-hours, put back in Home Assistant where they happened, whoever supplies you**
+**Put your UK smart meter's half-hourly electricity and gas into the Home Assistant Energy dashboard, whoever your supplier is**
 
 ![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![Home Assistant](https://img.shields.io/badge/Home_Assistant-2026.9-41BDF5?logo=homeassistant&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
+![Visibility](https://img.shields.io/badge/Repository-private-lightgrey)
 [![Tests](https://github.com/CaputoDavide93/HalfPast-Meter/actions/workflows/tests.yaml/badge.svg)](https://github.com/CaputoDavide93/HalfPast-Meter/actions/workflows/tests.yaml)
 
 </div>
+
+---
+
+> **Private on purpose.** HalfPast Meter has run against one live Bright account, but
+> several behaviours are still unproven (see [what is tested](#-tested-and-unverified)).
+> Until they are, the repository stays private, so HACS cannot install it and
+> `scripts/install-on-ha.sh` ships it instead. The README, diagrams and docs use demo
+> data only, so the repository can go public without a rewrite; the steps are in
+> [docs/development.md](docs/development.md#going-public).
+
+## 💡 Why it exists
+
+You have a smart meter, and Bright (Hildebrand Glow's free app) shows your usage by the
+half hour. Home Assistant's Energy dashboard cannot see any of it, and a sensor that
+records a reading when Home Assistant happens to poll puts late data in the wrong hour.
+The meter's data reaches Glowmarkt 30 minutes to two days after the fact.
+
+HalfPast Meter imports the readings as hourly external statistics, each one placed at the
+hour it was measured, so the Energy dashboard shows what the meter measured. It works
+with any supplier, because Bright reads the meter through the DCC, not through the
+supplier.
+
+| | HalfPast Meter | A sensor integration | Typing readings in by hand |
+|---|---|---|---|
+| Late readings land in the right hour | Yes, the last week is re-read every pass | Depends on the integration; a polled sensor records them when it is read | Only if you backdate each one |
+| Gaps | Left as gaps, never drawn as zero | Usually the last value, or zero | Whatever you type |
+| History on first setup | Up to a year (1 to 3650 days) | Usually none | Whatever you type |
+| Cost and tariff | Cost statistics, plus unit rate and standing charge from the meter | Depends on the integration | Your own sums |
+| Live power | No | Only with a local device | No |
+| Works while the repository is private | Yes, installed over SSH | Yes | Yes |
+
+The trade-off: nothing here is live. The feed is half-hourly and arrives late.
+
+---
+
+## 🚀 Install in 3 steps
+
+You need Home Assistant 2026.9 or newer, a Bright account that already shows your usage
+(iOS or Android app, free), and SSH to your Home Assistant host (the SSH add-on, key login).
+
+1. **Clone and point the script at your host.**
+
+   ```bash
+   git clone https://github.com/CaputoDavide93/HalfPast-Meter && cd HalfPast-Meter
+   cp .env.example .env        # set HA_SSH_TARGET to your host's SSH login
+   ```
+
+2. **Ship it.** `scripts/install-on-ha.sh --restart` copies the committed component and runs
+   `ha core restart`. (Or copy `custom_components/bright_meter/` into `config/custom_components/` and restart.)
+3. **Add it.** **Settings, Devices and services, Add integration, HalfPast Meter.** Four pages: sign in, your meters, how much history, the statistics to pick for the Energy dashboard.
+
+If another integration already feeds the same meters, remove it from the dashboard first, or
+the energy is counted twice. Details and checks: [docs/setup.md](docs/setup.md).
 
 ---
 
@@ -47,23 +101,18 @@ Every 30 minutes the integration asks Glowmarkt how far each stream's data reach
 
 ---
 
-## 🚀 Quick Start
+## 🧪 Tested and unverified
 
-1. **Set up the Bright app** (iOS or Android, free): add your smart meter and let it share the meter's data. Wait until the app shows your usage.
-2. **Install.**
-   - **HACS** (once this repository is public; HACS installs only public repositories): **HACS → ⋮ → Custom repositories**, add `https://github.com/CaputoDavide93/HalfPast-Meter` as an **Integration**, install **HalfPast Meter**, restart Home Assistant.
-   - **While it is private**, from a clone:
-
-     ```bash
-     cp .env.example .env        # set HA_SSH_TARGET to your HA host's SSH login
-     scripts/install-on-ha.sh --restart
-     ```
-
-     Or copy `custom_components/bright_meter/` into Home Assistant's `config/custom_components/` and restart.
-3. **Add it:** **Settings → Devices & services → Add integration → HalfPast Meter**. The guided setup takes four pages: sign in, your meters and how far their data reaches, how much history, and the exact statistics for the Energy dashboard.
-4. **Energy dashboard:** pick the statistics page 4 lists. If another integration already feeds the same meters, remove it from the dashboard first, or the energy is counted twice.
-
-Step by step, with what to check afterwards: [docs/setup.md](docs/setup.md).
+| Area | Status |
+|---|---|
+| Statistics import, gaps, late data, clock-change days, tariff fallback, reauth, diagnostics | Tested: pytest suite against a real recorder, Home Assistant 2026.9.4, Python 3.14 |
+| Sign-in, streams and import on a live Bright account | Run on one account; no wider coverage |
+| Home Assistant HACS and Hassfest validation | Hassfest runs in CI; the HACS action runs only once the repository is public (it cannot validate a private one) |
+| DCC catch-up request limit of two hours | Unverified: published folklore, the integration keeps to it |
+| Which half-hour carries the standing charge in the cost stream | Unverified |
+| The tariff payload's real shape | Unverified: both documented shapes are parsed |
+| Gas returned in m³ instead of kWh | Unverified |
+| Accounts with only DCC data, or several sites | Unverified |
 
 ---
 
@@ -73,6 +122,7 @@ Step by step, with what to check afterwards: [docs/setup.md](docs/setup.md).
 |---|---|
 | [Setup](docs/setup.md) | The Bright app, installing, the four setup pages, checking it worked |
 | [Energy dashboard](docs/energy-dashboard.md) | Which statistic goes where, and moving over from another integration |
+| [FAQ](docs/faq.md) | Short answers: suppliers, live power, privacy, why it is private |
 | [Statistics and sensors](docs/entities.md) | Every statistic and sensor, generated from the code |
 | [How it works](docs/how-it-works.md) | One 30-minute pass, and the rules that keep the history right |
 | [Troubleshooting](docs/troubleshooting.md) | Symptoms first, then diagnostics and debug logging |
@@ -153,16 +203,6 @@ The supplier has not sent a rate to the meter over the DCC, or has not yet after
 
 </details>
 
-<details>
-<summary><b>Not yet verified against a live account</b></summary>
-
-- how often the DCC catch-up may be requested (two hours is the published folklore, and the integration keeps to it);
-- which half-hour carries the standing charge in the cost stream;
-- the tariff payload's real shape (both documented shapes are parsed);
-- whether gas ever comes back in m³ rather than kWh.
-
-</details>
-
 ---
 
 ## 📁 Repo structure
@@ -178,9 +218,10 @@ HalfPast-Meter/
 ├── tools/
 │   ├── gen_diagram.py       # 🗺️ draws the diagrams in docs/assets/
 │   └── gen_docs.py          # 🤖 the statistics and sensor tables (README, docs/entities.md)
-├── docs/                    # 📚 setup, energy dashboard, entities, how it works, API, development
-│   └── assets/              # 🖼️ banner and diagrams, light and dark
+├── docs/                    # 📚 setup, FAQ, energy dashboard, entities, how it works, API, development
+│   └── assets/              # 🖼️ banner, brand tile and diagrams, light and dark
 ├── .github/                 # 🤖 tests, Hassfest and HACS workflows, dependabot
+├── llms.txt                 # 🤖 the project in one plain-text page
 ├── Makefile                 # 🔧 venv, check, test, lint, diagram, install
 ├── .env.example             # ⚙️ the install script's SSH target
 ├── hacs.json  pyproject.toml  pytest.ini  requirements_test.txt

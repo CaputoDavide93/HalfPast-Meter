@@ -1,0 +1,31 @@
+# HalfPast Meter
+
+> HalfPast Meter is a Home Assistant custom integration (domain `bright_meter`, MIT) that imports a UK smart meter's half-hourly electricity and gas readings, and their cost, as hourly external statistics for the Energy dashboard. It reads them from Hildebrand's Glowmarkt API, the service behind the free Bright app, so it works with any supplier whose SMETS2 meter Bright can read. The repository is private until the integration is proven on a live account.
+
+Key facts:
+
+- Needs: Home Assistant 2026.9 or newer, and a Bright account that already shows usage.
+- Install while private: clone, copy `.env.example` to `.env`, set `HA_SSH_TARGET`, run `scripts/install-on-ha.sh --restart`. HACS cannot install a private repository.
+- Statistics: `bright_meter:electricity_consumption`, `_consumption_cost`, `electricity_export`, `gas_consumption`, `gas_consumption_cost`. These ids and the domain must never be renamed: it orphans the imported history.
+- Gaps stay gaps (no row), real zeros import, the last week is re-read every pass, clock-change days (23 and 25 hours) are handled.
+- Not live: the feed is half-hourly and 30 minutes to two days late. No live power.
+- Tested: pytest suite against a real recorder on Home Assistant 2026.9.4, Python 3.14. Run on one live Bright account.
+- Unverified: DCC catch-up rate limit, which half-hour carries the standing charge, tariff payload shape, gas in m3, DCC-only accounts, several sites.
+- Checks: `make venv` once, then `make check`.
+- Independent project, not affiliated with Hildebrand or Glow.
+
+## Docs
+
+- [README](README.md): why it exists, install, tested and unverified
+- [FAQ](docs/faq.md): suppliers, live power, privacy, why it is private
+- [Setup](docs/setup.md): the Bright app, install, the four setup pages
+- [Energy dashboard](docs/energy-dashboard.md): which statistic goes where
+- [Troubleshooting](docs/troubleshooting.md): symptoms and diagnostics
+- [How it works](docs/how-it-works.md): one 30-minute pass and the history rules
+
+## Optional
+
+- [Glowmarkt API notes](docs/glowmarkt-api.md)
+- [Entities](docs/entities.md)
+- [Development](docs/development.md)
+- [Changelog](CHANGELOG.md)
