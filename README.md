@@ -13,7 +13,7 @@
 ![Home Assistant](https://img.shields.io/badge/Home_Assistant-2026.9-41BDF5?logo=homeassistant&logoColor=white)
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5)](https://hacs.xyz)
 ![License](https://img.shields.io/badge/License-MIT-green)
-[![Tests](https://github.com/CaputoDavide93/HalfPast-Meter/actions/workflows/tests.yaml/badge.svg)](https://github.com/CaputoDavide93/HalfPast-Meter/actions/workflows/tests.yaml)
+[![Tests](https://github.com/CaputoDavide93/HalfPast-Meter-Home-Assistant/actions/workflows/tests.yaml/badge.svg)](https://github.com/CaputoDavide93/HalfPast-Meter-Home-Assistant/actions/workflows/tests.yaml)
 
 </div>
 
@@ -53,10 +53,10 @@ The trade-off: nothing here is live. The feed is half-hourly and arrives late.
 You need Home Assistant 2026.9 or newer, [HACS](https://hacs.xyz), and a Bright account
 that already shows your usage (iOS or Android app, free).
 
-[![Open your Home Assistant instance and add this repository to HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=CaputoDavide93&repository=HalfPast-Meter&category=integration)
+[![Open your Home Assistant instance and add this repository to HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=CaputoDavide93&repository=HalfPast-Meter-Home-Assistant&category=integration)
 
 1. **Add the repository to HACS.** Use the button above, or in HACS open **⋮, Custom
-   repositories**, add `https://github.com/CaputoDavide93/HalfPast-Meter` with the type
+   repositories**, add `https://github.com/CaputoDavide93/HalfPast-Meter-Home-Assistant` with the type
    **Integration**.
 2. **Install it.** Download **HalfPast Meter** in HACS, then restart Home Assistant.
 3. **Add it.** **Settings, Devices and services, Add integration, HalfPast Meter.** Four pages: sign in, your meters, how much history, the statistics to pick for the Energy dashboard.
@@ -211,7 +211,7 @@ The supplier has not sent a rate to the meter over the DCC, or has not yet after
 ## 📁 Repo structure
 
 ```text
-HalfPast-Meter/
+HalfPast-Meter-Home-Assistant/
 ├── custom_components/
 │   └── bright_meter/        # 🧩 the integration: API client, coordinator, sensors, flows, brand icons
 ├── tests/                   # 🧪 pytest against Home Assistant 2026.9.4

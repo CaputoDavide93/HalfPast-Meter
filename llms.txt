@@ -5,7 +5,7 @@
 Key facts:
 
 - Needs: Home Assistant 2026.9 or newer, and a Bright account that already shows usage.
-- Install: in HACS, add `https://github.com/CaputoDavide93/HalfPast-Meter` as a custom repository of type Integration, download HalfPast Meter, restart. Without HACS, copy `custom_components/bright_meter/` into `config/custom_components/`.
+- Install: in HACS, add `https://github.com/CaputoDavide93/HalfPast-Meter-Home-Assistant` as a custom repository of type Integration, download HalfPast Meter, restart. Without HACS, copy `custom_components/bright_meter/` into `config/custom_components/`.
 - Statistics: `bright_meter:electricity_consumption`, `_consumption_cost`, `electricity_export`, `gas_consumption`, `gas_consumption_cost`. These ids and the domain must never be renamed: it orphans the imported history.
 - Gaps stay gaps (no row), real zeros import, the last week is re-read every pass, clock-change days (23 and 25 hours) are handled.
 - Not live: the feed is half-hourly and 30 minutes to two days late. No live power.

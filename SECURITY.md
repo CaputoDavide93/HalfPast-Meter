@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please report vulnerabilities privately via
-[GitHub Security Advisories](https://github.com/CaputoDavide93/HalfPast-Meter/security/advisories/new)
+[GitHub Security Advisories](https://github.com/CaputoDavide93/HalfPast-Meter-Home-Assistant/security/advisories/new)
 rather than opening a public issue. You should get a response within a week.
 
 ## Data handling
