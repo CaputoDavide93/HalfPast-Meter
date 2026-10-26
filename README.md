@@ -1,6 +1,9 @@
 <div align="center">
 
-<img src="docs/assets/banner.png" alt="The HalfPast Meter mark, three rising bars on a tile, beside half-hourly bars of electricity in amber and gas in blue." width="100%">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="custom_components/bright_meter/brand/dark_icon@2x.png">
+  <img src="custom_components/bright_meter/brand/icon@2x.png" alt="HalfPast Meter icon: three rising bars on a rounded tile" width="104" height="104">
+</picture>
 
 # 📊 HalfPast Meter
 
@@ -70,6 +73,8 @@ the energy is counted twice. Details and checks: [docs/setup.md](docs/setup.md).
 ---
 
 ## ✨ Features
+
+<img src="docs/assets/banner.png" alt="The HalfPast Meter mark, three rising bars on a tile, beside half-hourly bars of electricity in amber and gas in blue." width="100%">
 
 | | Feature | What it does |
 |---|---|---|
@@ -219,7 +224,7 @@ HalfPast-Meter/
 │   ├── gen_diagram.py       # 🗺️ draws the diagrams in docs/assets/
 │   └── gen_docs.py          # 🤖 the statistics and sensor tables (README, docs/entities.md)
 ├── docs/                    # 📚 setup, FAQ, energy dashboard, entities, how it works, API, development
-│   └── assets/              # 🖼️ banner, brand tile and diagrams, light and dark
+│   └── assets/              # 🖼️ banner and diagrams, light and dark
 ├── .github/                 # 🤖 tests, Hassfest and HACS workflows, dependabot
 ├── llms.txt                 # 🤖 the project in one plain-text page
 ├── Makefile                 # 🔧 venv, check, test, lint, diagram, install
