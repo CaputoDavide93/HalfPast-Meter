@@ -22,7 +22,7 @@ local MQTT, which this integration does not read.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/import-pass-dark.svg">
-  <img src="assets/import-pass-light.svg" width="100%" alt="Every 30 minutes bright_meter asks Glowmarkt how far each stream reaches, then a background import reads the hourly readings, checks them, and writes them to the recorder in one batch.">
+  <img src="assets/import-pass-light.svg" width="100%" alt="Every 30 minutes HalfPast Meter asks Glowmarkt how far each stream reaches, then a background import reads the hourly readings, checks them, and writes them to the recorder in one batch.">
 </picture>
 
 **The poll** (every 30 minutes, the coordinator's update):
