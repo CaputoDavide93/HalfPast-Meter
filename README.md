@@ -96,7 +96,7 @@ Nothing here is live. The DCC feed is half-hourly and 30 minutes to two days lat
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
-  <img src="docs/assets/architecture-light.svg" width="100%" alt="The smart meter's half-hourly reads reach the Glowmarkt API through the DCC; bright_meter polls it every 30 minutes and writes hourly external statistics for the Energy dashboard, plus a few sensors.">
+  <img src="docs/assets/architecture-light.svg" width="100%" alt="The smart meter's half-hourly reads reach the Glowmarkt API through the DCC; HalfPast Meter polls it every 30 minutes and writes hourly external statistics for the Energy dashboard, plus a few sensors.">
 </picture>
 
 Every 30 minutes the integration asks Glowmarkt how far each stream's data reaches, nudges it to fetch new readings from the DCC (at most every two hours), and reads the meter's tariff every six hours. A background import then reads hourly readings from a week before the newest stored hour (or the whole configured history on the first run) up to `last-time`, and writes them with `async_add_external_statistics`.

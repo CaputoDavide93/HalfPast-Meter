@@ -223,24 +223,24 @@ class Canvas:
 def architecture(scheme):
     k = Canvas(1180, 444, scheme,
                "The smart meter's half-hourly reads reach the Glowmarkt API through the "
-               "DCC; bright_meter polls it every 30 minutes and writes hourly external "
+               "DCC; HalfPast Meter polls it every 30 minutes and writes hourly external "
                "statistics for the Energy dashboard, plus a few sensors.")
     W, H = 206, 112
     xs, top = [24, 330, 636, 950], 56
     mid = top + H / 2
     low = top + H + 84
     k.add(
-        k.box(xs[0], top, W, H, "Smart meter", ["SMETS2 electricity",
+        k.box(xs[0], top, W, H, "Smart Meter", ["SMETS2 electricity",
               "and gas, via the DCC"], icon="bolt"),
         k.box(xs[1], top, W, H, "Glowmarkt API", ["the Bright app's",
               "backend"], icon="cloud"),
-        k.box(xs[2], top, W, H, "bright_meter", ["this integration,",
+        k.box(xs[2], top, W, H, "HalfPast Meter", ["this integration,",
               "every 30 minutes"], icon="refresh", tone="accent"),
-        k.box(xs[3], top, W, H, "HA recorder", ["external statistics",
+        k.box(xs[3], top, W, H, "Recorder", ["Home Assistant statistics,",
               "bright_meter:*"], icon="database"),
         k.box(xs[2], low, W, H, "Sensors", ["last full day, data",
               "until, tariff"], icon="chart"),
-        k.box(xs[3], low, W, H, "Energy dashboard", ["each hour where",
+        k.box(xs[3], low, W, H, "Energy Dashboard", ["each hour where",
               "it happened"], icon="house"),
         k.edge([(xs[0] + W + 8, mid), (xs[1] - 8, mid)], label="half-hours"),
         k.edge([(xs[1] + W + 8, mid), (xs[2] - 8, mid)], label="readings",
@@ -257,17 +257,17 @@ def architecture(scheme):
 def import_pass(scheme):
     """One 30-minute pass, end to end. A sequence, so it gets lifelines."""
     k = Canvas(1180, 640, scheme,
-               "Every 30 minutes bright_meter asks Glowmarkt how far each stream "
+               "Every 30 minutes HalfPast Meter asks Glowmarkt how far each stream "
                "reaches, then a background import reads the hourly readings, checks "
                "them, and writes them to the recorder in one batch.")
     c = k.c
     B, G, R = 150, 590, 1030
-    lanes = [("bright_meter", B, "refresh"), ("Glowmarkt API", G, "cloud"),
-             ("HA recorder", R, "database")]
+    lanes = [("HalfPast Meter", B, "refresh"), ("Glowmarkt API", G, "cloud"),
+             ("Recorder", R, "database")]
     top, bottom = 84, 574
     for name, x, icon in lanes:
         w = 196
-        tone = "accent" if name == "bright_meter" else "plain"
+        tone = "accent" if name == "HalfPast Meter" else "plain"
         k.add(k.box(x - w / 2, 26, w, 44, name, icon=icon, tone=tone),
               f'<line x1="{x}" y1="{top - 14}" x2="{x}" y2="{bottom}" '
               f'stroke="{c["border"]}" stroke-width="1" stroke-dasharray="4 5"/>')
@@ -287,12 +287,12 @@ def import_pass(scheme):
                          weight="600"))
 
     k.add(
-        block(92, 150, "the poll, every 30 minutes"),
+        block(92, 150, "Poll: every 30 minutes"),
         msg(132, B + 8, G - 8, "catchup (at most every 2 h)"),
         msg(170, B + 8, G - 8, "last-time, each stream"),
         msg(204, G - 8, B + 8, "newest half-hour held", dash=True),
         msg(232, B + 8, G - 8, "tariff (every 6 h)"),
-        block(260, 300, "then in the background, the import, per stream"),
+        block(260, 300, "Import: in the background, per stream"),
         msg(300, B + 8, R - 8, "last stored hour, and the total before the window"),
         msg(332, R - 8, B + 8, "anchor sum", dash=True),
         msg(370, B + 8, G - 8, "readings PT1H nulls=1, 30-day chunks"),
@@ -317,13 +317,13 @@ def setup_flow(scheme):
     xs, top = [24, 318, 612, 906], 52
     mid = top + H / 2
     k.add(
-        k.box(xs[0], top, W, H, "1. Sign in", ["Bright app email and",
+        k.box(xs[0], top, W, H, "1. Sign In", ["Bright app email and",
               "password, checked live"], icon="key"),
-        k.box(xs[1], top, W, H, "2. Your meters", ["each stream and how far",
+        k.box(xs[1], top, W, H, "2. Your Meters", ["each stream and how far",
               "its data reaches"], icon="search"),
         k.box(xs[2], top, W, H, "3. History", ["days to import on the",
               "first pass (365)"], icon="calendar"),
-        k.box(xs[3], top, W, H, "4. Energy dashboard", ["which statistic goes",
+        k.box(xs[3], top, W, H, "4. Energy Dashboard", ["which statistic goes",
               "in which field"], icon="chart", tone="accent"),
         k.edge([(xs[0] + W + 8, mid), (xs[1] - 8, mid)]),
         k.edge([(xs[1] + W + 8, mid), (xs[2] - 8, mid)]),
